@@ -12,6 +12,7 @@ from typing import Optional
 import datetime
 import asyncio
 from contextlib import asynccontextmanager
+from fastapi.middleware.cors import CORSMiddleware  # Allows browser dashboards to talk to this API from any webpage
 
 
 # ============================================================
@@ -30,6 +31,18 @@ async def lifespan(app):
 
 
 app = FastAPI(lifespan=lifespan)
+# ============================================================
+# CORS MIDDLEWARE
+# Without this, browsers block the dashboard from calling the API
+# allow_origins=["*"] means any webpage can connect — fine for now
+# In production you'd replace "*" with your exact dashboard URL
+# ============================================================
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],     # Allow requests from any webpage
+    allow_methods=["*"],     # Allow GET, POST, PATCH and all other methods
+    allow_headers=["*"],     # Allow all headers
+)
 
 
 # ============================================================
