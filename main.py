@@ -131,7 +131,7 @@ class TowelCreate(BaseModel):
 # POST /towels
 # Body: { "tag_id": "TOWEL-001", "towel_type": "bath" }
 @app.post("/towels")
-def register_towel(towel: TowelCreate):
+def register_towel(towel: TowelCreate) , _=Depends(verify_key):
     db = SessionLocal()
 
     # Block duplicate registrations — each RFID tag is unique
