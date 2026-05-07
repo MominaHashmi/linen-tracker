@@ -13,7 +13,34 @@ import datetime
 import asyncio
 from contextlib import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware  # Allows browser dashboards to talk to this API from any webpage
+import os  # lets us read environment variables like API_KEY
+from fastapi.security.api_key import APIKeyHeader  # handles reading the key from request headers
+from fastapi import Security  # used to attach security checks to endpoints
+from fastapi import FastAPI, HTTPException, Depends
 
+
+# ============================================================
+# AUTHENTICATION SETUP
+# Reads the API_KEY from Railway's environment variables
+# If not set, falls back to "dev-key" for local testing only
+# ============================================================
+
+# Read the API key from the server's environment variables
+API_KEY = os.getenv("API_KEY", "dev-key")
+
+# This tells FastAPI to look for a header called "X-API-Key" in every request
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+# This function runs on every protected endpoint
+# If the key matches, the request goes through
+# If not, it gets blocked with a 403 error
+def verify_key(key: str = Security(api_key_header)):
+    if key != API_KEY:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid or missing API key"  # Don't tell them what the right key is
+        )
+        
 
 # ============================================================
 # STARTUP & SHUTDOWN
@@ -161,7 +188,7 @@ def get_towel(tag_id: str):
 # PATCH /towels/TOWEL-001/dispatch?location=Room202
 # Blocks if towel is already out (prevents double dispatch)
 @app.patch("/towels/{tag_id}/dispatch")
-def dispatch_towel(tag_id: str, location: Optional[str] = None):
+def dispatch_towel(tag_id: str, location: Optional[str] = None, _=Depends(verify_key)):
     db = SessionLocal()
     towel = db.query(Towel).filter(Towel.tag_id == tag_id).first()
     if not towel:
