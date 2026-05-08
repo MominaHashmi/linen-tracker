@@ -131,7 +131,7 @@ class TowelCreate(BaseModel):
 # POST /towels
 # Body: { "tag_id": "TOWEL-001", "towel_type": "bath" }
 @app.post("/towels")
-def register_towel(towel: TowelCreate) , _=Depends(verify_key):
+def register_towel(towel: TowelCreate , _=Depends(verify_key)):
     db = SessionLocal()
 
     # Block duplicate registrations — each RFID tag is unique
@@ -228,7 +228,7 @@ def dispatch_towel(tag_id: str, location: Optional[str] = None, _=Depends(verify
 # PATCH /towels/TOWEL-001/return
 # Moves towel to "in_laundry" and clears its dispatch timestamp
 @app.patch("/towels/{tag_id}/return")
-def return_towel(tag_id: str) , _=Depends(verify_key):
+def return_towel(tag_id: str, _=Depends(verify_key)):
     db = SessionLocal()
     towel = db.query(Towel).filter(Towel.tag_id == tag_id).first()
     if not towel:
