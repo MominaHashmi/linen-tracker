@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linen Tracker — Staff Terminal</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0f1117;
+  --surface:#181b23;
+  --card:#1e2130;
+  --border:#2a2e3e;
+  --text:#c8ccd8;
+  --dim:#5a607a;
+  --white:#f0f2f8;
+  --blue:#4f8ef7;
+  --blue-dark:#1a3a7a;
+  --green:#34d399;
+  --green-dark:#064e3b;
+  --red:#f87171;
+  --red-dark:#7f1d1d;
+  --orange:#fbbf24;
+  --orange-dark:#78350f;
+  --accent:#4f8ef7;
+}
+
+html{font-size:15px}
+body{
+  font-family:'Syne',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ===== HEADER ===== */
+header{
+  background:var(--surface);
+  border-bottom:1px solid var(--border);
+  padding:14px 32px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+.brand{display:flex;align-items:center;gap:12px}
+.brand-icon{
+  width:36px;height:36px;border-radius:8px;
+  background:var(--blue-dark);
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.1rem;
+}
+.brand h1{font-size:.95rem;color:var(--white);font-weight:700;letter-spacing:-.01em}
+.brand p{font-size:.65rem;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin-top:1px}
+.header-right{display:flex;align-items:center;gap:16px}
+.clock{font-family:'DM Mono',monospace;font-size:.78rem;color:var(--dim)}
+.status-pill{
+  display:flex;align-items:center;gap:6px;
+  padding:4px 12px;border-radius:20px;
+  background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.2);
+  font-size:.68rem;color:var(--green);font-weight:600;
+}
+.status-pill .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ===== MAIN LAYOUT ===== */
+main{
+  flex:1;display:grid;
+  grid-template-columns:1fr 360px;
+  gap:0;
+  max-width:1100px;
+  margin:0 auto;
+  width:100%;
+  padding:32px 24px;
+  gap:28px;
+}
+
+/* ===== SCAN PANEL ===== */
+.scan-panel{display:flex;flex-direction:column;gap:20px}
+
+.scan-card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:28px;
+}
+
+.scan-card h2{
+  font-size:.72rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.1em;
+  font-weight:600;margin-bottom:20px;
+}
+
+/* Tag input */
+.tag-input-wrap{position:relative;margin-bottom:16px}
+.tag-input{
+  width:100%;
+  background:var(--surface);
+  border:2px solid var(--border);
+  border-radius:10px;
+  padding:16px 20px;
+  font-size:1.4rem;
+  color:var(--white);
+  font-family:'DM Mono',monospace;
+  font-weight:500;
+  letter-spacing:.05em;
+  outline:none;
+  transition:border-color .2s,box-shadow .2s;
+}
+.tag-input:focus{
+  border-color:var(--blue);
+  box-shadow:0 0 0 3px rgba(79,142,247,.15);
+}
+.tag-input::placeholder{color:var(--dim);font-size:1rem;letter-spacing:.02em}
+.tag-input-label{
+  position:absolute;top:-9px;left:14px;
+  font-size:.62rem;color:var(--blue);
+  background:var(--card);padding:0 6px;
+  text-transform:uppercase;letter-spacing:.08em;font-weight:600;
+}
+
+/* Location select */
+.location-wrap{margin-bottom:20px}
+.location-label{
+  font-size:.68rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.08em;
+  font-weight:600;margin-bottom:8px;display:block;
+}
+.location-select{
+  width:100%;
+  background:var(--surface);
+  border:2px solid var(--border);
+  border-radius:10px;
+  padding:11px 16px;
+  font-size:.85rem;
+  color:var(--white);
+  font-family:'Syne',sans-serif;
+  outline:none;
+  cursor:pointer;
+  transition:border-color .2s;
+}
+.location-select:focus{border-color:var(--blue)}
+.location-select option{background:var(--surface)}
+
+/* Action buttons */
+.action-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.btn{
+  padding:14px 20px;border-radius:10px;
+  font-size:.85rem;font-weight:700;
+  font-family:'Syne',sans-serif;
+  border:none;cursor:pointer;
+  transition:all .15s;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  letter-spacing:.02em;
+}
+.btn:active{transform:scale(.97)}
+.btn-dispatch{
+  background:var(--blue);color:#fff;
+}
+.btn-dispatch:hover{background:#3d7ef5;box-shadow:0 4px 16px rgba(79,142,247,.35)}
+.btn-return{
+  background:var(--green-dark);color:var(--green);
+  border:1px solid rgba(52,211,153,.25);
+}
+.btn-return:hover{background:rgba(52,211,153,.15);box-shadow:0 4px 16px rgba(52,211,153,.15)}
+.btn-missing{
+  width:100%;margin-top:10px;
+  background:transparent;color:var(--dim);
+  border:1px solid var(--border);font-size:.78rem;
+  padding:10px;
+}
+.btn-missing:hover{color:var(--red);border-color:var(--red);background:rgba(248,113,113,.05)}
+
+/* ===== FEEDBACK TOAST ===== */
+.toast{
+  border-radius:12px;padding:16px 20px;
+  display:flex;align-items:flex-start;gap:12px;
+  animation:slideIn .25s ease;
+  margin-top:4px;
+}
+@keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+.toast.success{background:rgba(52,211,153,.1);border:1px solid rgba(52,211,153,.25)}
+.toast.error{background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25)}
+.toast.info{background:rgba(79,142,247,.1);border:1px solid rgba(79,142,247,.25)}
+.toast-icon{font-size:1.2rem;flex-shrink:0;margin-top:1px}
+.toast-title{font-size:.82rem;font-weight:700;color:var(--white);margin-bottom:3px}
+.toast-msg{font-size:.75rem;color:var(--dim);line-height:1.4}
+.toast-tag{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--blue);margin-top:4px}
+#feedback{min-height:20px}
+
+/* ===== QUICK LOOKUP ===== */
+.lookup-result{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:10px;padding:16px;margin-top:4px;
+}
+.lookup-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:5px 0;border-bottom:1px solid var(--border);font-size:.78rem;
+}
+.lookup-row:last-child{border-bottom:none}
+.lookup-key{color:var(--dim)}
+.lookup-val{color:var(--white);font-weight:600;font-family:'DM Mono',monospace;font-size:.72rem}
+.badge{
+  padding:2px 8px;border-radius:4px;font-size:.65rem;font-weight:700;
+  letter-spacing:.04em;
+}
+.badge-blue{background:rgba(79,142,247,.15);color:var(--blue)}
+.badge-green{background:rgba(52,211,153,.15);color:var(--green)}
+.badge-orange{background:rgba(251,191,36,.15);color:var(--orange)}
+.badge-red{background:rgba(248,113,113,.15);color:var(--red)}
+
+/* ===== ACTIVITY LOG ===== */
+.log-panel{display:flex;flex-direction:column;gap:0}
+.log-header{
+  font-size:.68rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.1em;font-weight:600;
+  padding:0 0 12px;border-bottom:1px solid var(--border);margin-bottom:4px;
+  display:flex;justify-content:space-between;align-items:center;
+}
+.log-clear{
+  font-size:.62rem;color:var(--dim);background:none;border:none;
+  cursor:pointer;color:var(--dim);font-family:'Syne',sans-serif;
+}
+.log-clear:hover{color:var(--red)}
+.log-list{display:flex;flex-direction:column;gap:0;max-height:calc(100vh - 200px);overflow-y:auto}
+.log-list::-webkit-scrollbar{width:3px}
+.log-list::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+.log-item{
+  display:flex;gap:10px;padding:10px 0;
+  border-bottom:1px solid rgba(42,46,62,.6);
+  animation:fadeIn .2s ease;
+}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.log-item:last-child{border-bottom:none}
+.log-dot{
+  width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px;
+}
+.log-body{flex:1}
+.log-action{font-size:.78rem;color:var(--white);font-weight:600}
+.log-detail{font-size:.68rem;color:var(--dim);margin-top:2px;font-family:'DM Mono',monospace}
+.log-time{font-size:.62rem;color:var(--dim);flex-shrink:0;margin-top:4px;font-family:'DM Mono',monospace}
+.log-empty{
+  text-align:center;padding:40px 20px;
+  color:var(--dim);font-size:.78rem;
+}
+
+/* ===== SIDE PANEL ===== */
+.side-panel{display:flex;flex-direction:column;gap:20px}
+.side-card{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;padding:20px;
+}
+.side-card h3{
+  font-size:.68rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.1em;font-weight:600;
+  margin-bottom:14px;
+}
+
+/* Mini KPIs */
+.mini-kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.mini-kpi{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:8px;padding:12px;text-align:center;
+}
+.mini-kpi-val{font-size:1.4rem;font-weight:800;color:var(--white);letter-spacing:-.02em}
+.mini-kpi-label{font-size:.6rem;color:var(--dim);text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+.mini-kpi.blue .mini-kpi-val{color:var(--blue)}
+.mini-kpi.green .mini-kpi-val{color:var(--green)}
+.mini-kpi.orange .mini-kpi-val{color:var(--orange)}
+.mini-kpi.red .mini-kpi-val{color:var(--red)}
+
+/* Instructions */
+.instructions{display:flex;flex-direction:column;gap:8px}
+.inst-step{
+  display:flex;gap:10px;align-items:flex-start;
+  font-size:.75rem;color:var(--dim);line-height:1.4;
+}
+.inst-num{
+  width:20px;height:20px;border-radius:50%;
+  background:var(--surface);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;
+  font-size:.6rem;font-weight:700;color:var(--blue);flex-shrink:0;
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="brand">
+    <div class="brand-icon">🏨</div>
+    <div>
+      <h1>Linen Tracker</h1>
+      <p>Staff Terminal</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="clock" id="clock"></span>
+    <div class="status-pill"><span class="dot"></span>System Online</div>
+  </div>
+</header>
+
+<!-- Main -->
+<main>
+
+  <!-- Left: Scan + Feedback + Log -->
+  <div class="scan-panel">
+
+    <!-- Scan Card -->
+    <div class="scan-card">
+      <h2>Scan or Enter Tag ID</h2>
+
+      <!-- Tag input — works with USB reader (auto-types) or manual entry -->
+      <div class="tag-input-wrap">
+        <span class="tag-input-label">RFID Tag ID</span>
+        <input
+          type="text"
+          class="tag-input"
+          id="tag-input"
+          placeholder="e.g. TOWEL-001"
+          autocomplete="off"
+          autofocus
+        />
+      </div>
+
+      <!-- Location dropdown -->
+      <div class="location-wrap">
+        <span class="location-label">Location</span>
+        <select class="location-select" id="location-select">
+          <option value="">— Select location —</option>
+          <option value="Laundry Exit">Laundry Exit</option>
+          <option value="Laundry Entry">Laundry Entry</option>
+          <option value="Floor 1">Floor 1</option>
+          <option value="Floor 2">Floor 2</option>
+          <option value="Floor 3">Floor 3</option>
+          <option value="Floor 4">Floor 4</option>
+          <option value="Floor 5">Floor 5</option>
+          <option value="Pool Area">Pool Area</option>
+          <option value="Gym">Gym</option>
+          <option value="Spa">Spa</option>
+        </select>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="action-row">
+        <button class="btn btn-dispatch" onclick="doDispatch()">
+          ↗ Dispatch
+        </button>
+        <button class="btn btn-return" onclick="doReturn()">
+          ↙ Return
+        </button>
+      </div>
+      <button class="btn btn-missing" onclick="doLookup()">
+        🔍 Look up tag status
+      </button>
+    </div>
+
+    <!-- Feedback area — shows success/error after each action -->
+    <div id="feedback"></div>
+
+    <!-- Session activity log -->
+    <div class="scan-card">
+      <div class="log-header">
+        Session Activity
+        <button class="log-clear" onclick="clearLog()">Clear</button>
+      </div>
+      <div class="log-list" id="log-list">
+        <div class="log-empty" id="log-empty">No actions yet this session</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right: Live inventory + instructions -->
+  <div class="side-panel">
+
+    <!-- Live inventory counts -->
+    <div class="side-card">
+      <h3>Live Inventory</h3>
+      <div class="mini-kpis">
+        <div class="mini-kpi blue"><div class="mini-kpi-val" id="kpi-total">—</div><div class="mini-kpi-label">Total</div></div>
+        <div class="mini-kpi green"><div class="mini-kpi-val" id="kpi-inuse">—</div><div class="mini-kpi-label">In Use</div></div>
+        <div class="mini-kpi orange"><div class="mini-kpi-val" id="kpi-laundry">—</div><div class="mini-kpi-label">Laundry</div></div>
+        <div class="mini-kpi red"><div class="mini-kpi-val" id="kpi-missing">—</div><div class="mini-kpi-label">Missing</div></div>
+      </div>
+    </div>
+
+    <!-- How to use instructions -->
+    <div class="side-card">
+      <h3>How to Use</h3>
+      <div class="instructions">
+        <div class="inst-step"><div class="inst-num">1</div>Scan the RFID tag with the desktop reader — the Tag ID fills in automatically</div>
+        <div class="inst-step"><div class="inst-num">2</div>Or type the Tag ID manually if needed</div>
+        <div class="inst-step"><div class="inst-num">3</div>Select the location from the dropdown</div>
+        <div class="inst-step"><div class="inst-num">4</div>Press <strong>Dispatch</strong> when sending clean towels out to rooms</div>
+        <div class="inst-step"><div class="inst-num">5</div>Press <strong>Return</strong> when dirty towels come back to laundry</div>
+        <div class="inst-step"><div class="inst-num">6</div>Use <strong>Look up</strong> to check any towel's current status</div>
+      </div>
+    </div>
+
+    <!-- USB reader tip -->
+    <div class="side-card" style="border-color:rgba(79,142,247,.25);background:rgba(79,142,247,.05)">
+      <h3 style="color:var(--blue)">USB Reader Tip</h3>
+      <p style="font-size:.75rem;color:var(--dim);line-height:1.5">
+        Keep this page open and the Tag ID field focused. When you wave a tag near the USB reader it will automatically type the ID and press Enter — no clicking needed.
+      </p>
+    </div>
+
+  </div>
+</main>
+
+<script>
+// ============================================================
+// CONFIGURATION — your Railway API
+// ============================================================
+var API_BASE = 'https://web-production-51ae0.up.railway.app';
+var API_KEY  = 'hotel-linen-2026-xK9mP'; // Replace with your actual API key from Railway
+
+// ============================================================
+// HELPERS
+// ============================================================
+function getTag() {
+  return document.getElementById('tag-input').value.trim().toUpperCase();
+}
+function getLocation() {
+  return document.getElementById('location-select').value;
+}
+function clearInput() {
+  document.getElementById('tag-input').value = '';
+  document.getElementById('tag-input').focus(); // Keep focus for next scan
+}
+
+// Headers sent with every request — includes API key for protected endpoints
+function authHeaders() {
+  return {
+    'Content-Type': 'application/json',
+    'X-API-Key': API_KEY
+  };
+}
+
+// ============================================================
+// FEEDBACK TOAST
+// Shows success/error message after each action
+// type: 'success', 'error', 'info'
+// ============================================================
+function showFeedback(type, title, msg, tag) {
+  var icons = { success: '✓', error: '✗', info: '●' };
+  document.getElementById('feedback').innerHTML =
+    '<div class="toast ' + type + '">' +
+      '<div class="toast-icon">' + icons[type] + '</div>' +
+      '<div>' +
+        '<div class="toast-title">' + title + '</div>' +
+        '<div class="toast-msg">' + msg + '</div>' +
+        (tag ? '<div class="toast-tag">' + tag + '</div>' : '') +
+      '</div>' +
+    '</div>';
+}
+
+// ============================================================
+// SESSION ACTIVITY LOG
+// Keeps a running log of everything done this session
+// ============================================================
+var logItems = [];
+
+function addLog(action, detail, color) {
+  logItems.unshift({ action, detail, color, time: new Date().toLocaleTimeString() });
+  renderLog();
+}
+
+function renderLog() {
+  var el = document.getElementById('log-list');
+  document.getElementById('log-empty').style.display = logItems.length ? 'none' : 'block';
+  var existing = el.querySelectorAll('.log-item');
+  existing.forEach(function(e){ e.remove(); });
+  logItems.forEach(function(item) {
+    var div = document.createElement('div');
+    div.className = 'log-item';
+    div.innerHTML =
+      '<div class="log-dot" style="background:' + item.color + '"></div>' +
+      '<div class="log-body">' +
+        '<div class="log-action">' + item.action + '</div>' +
+        '<div class="log-detail">' + item.detail + '</div>' +
+      '</div>' +
+      '<div class="log-time">' + item.time + '</div>';
+    el.appendChild(div);
+  });
+}
+
+function clearLog() {
+  logItems = [];
+  renderLog();
+}
+
+// ============================================================
+// DISPATCH ACTION
+// Sends towel out to a room/location
+// ============================================================
+async function doDispatch() {
+  var tag = getTag();
+  var location = getLocation();
+
+  if (!tag) { showFeedback('error', 'No tag entered', 'Scan or type a Tag ID first'); return; }
+
+  try {
+    var url = API_BASE + '/towels/' + tag + '/dispatch' + (location ? '?location=' + encodeURIComponent(location) : '');
+    var res = await fetch(url, { method: 'PATCH', headers: authHeaders() });
+    var data = await res.json();
+
+    if (res.ok) {
+      showFeedback('success', 'Dispatched successfully', 'Wash #' + data.wash_count + ' · ' + (data.location || 'No location set'), tag);
+      addLog('DISPATCHED', tag + (location ? ' → ' + location : ''), 'var(--blue)');
+      clearInput();
+      fetchInventory(); // Refresh the KPI counts
+    } else if (res.status === 400) {
+      showFeedback('error', 'Already dispatched', data.detail, tag);
+    } else if (res.status === 404) {
+      showFeedback('error', 'Tag not found', 'This Tag ID is not registered in the system', tag);
+    } else {
+      showFeedback('error', 'Something went wrong', data.detail || 'Unknown error');
+    }
+  } catch(e) {
+    showFeedback('error', 'Cannot reach server', 'Check your internet connection');
+  }
+}
+
+// ============================================================
+// RETURN ACTION
+// Marks towel as returned to laundry
+// ============================================================
+async function doReturn() {
+  var tag = getTag();
+
+  if (!tag) { showFeedback('error', 'No tag entered', 'Scan or type a Tag ID first'); return; }
+
+  try {
+    var res = await fetch(API_BASE + '/towels/' + tag + '/return', { method: 'PATCH', headers: authHeaders() });
+    var data = await res.json();
+
+    if (res.ok) {
+      showFeedback('success', 'Returned to laundry', 'Towel is now in laundry queue', tag);
+      addLog('RETURNED', tag + ' → Laundry', 'var(--green)');
+      clearInput();
+      fetchInventory();
+    } else if (res.status === 404) {
+      showFeedback('error', 'Tag not found', 'This Tag ID is not registered in the system', tag);
+    } else {
+      showFeedback('error', 'Something went wrong', data.detail || 'Unknown error');
+    }
+  } catch(e) {
+    showFeedback('error', 'Cannot reach server', 'Check your internet connection');
+  }
+}
+
+// ============================================================
+// LOOKUP ACTION
+// Checks current status of a towel without changing anything
+// ============================================================
+async function doLookup() {
+  var tag = getTag();
+  if (!tag) { showFeedback('error', 'No tag entered', 'Scan or type a Tag ID first'); return; }
+
+  try {
+    var res = await fetch(API_BASE + '/towels/' + tag);
+    if (res.status === 404) {
+      showFeedback('error', 'Tag not found', 'This Tag ID is not registered', tag);
+      return;
+    }
+    var t = await res.json();
+    var statusColors = { in_use:'badge-blue', registered:'badge-green', in_laundry:'badge-orange', missing:'badge-red' };
+    document.getElementById('feedback').innerHTML =
+      '<div class="lookup-result">' +
+        '<div class="lookup-row"><span class="lookup-key">Tag ID</span><span class="lookup-val">' + t.tag_id + '</span></div>' +
+        '<div class="lookup-row"><span class="lookup-key">Type</span><span class="lookup-val">' + (t.towel_type||'—') + '</span></div>' +
+        '<div class="lookup-row"><span class="lookup-key">Status</span><span class="badge ' + (statusColors[t.status]||'badge-blue') + '">' + t.status.replace('_',' ').toUpperCase() + '</span></div>' +
+        '<div class="lookup-row"><span class="lookup-key">Location</span><span class="lookup-val">' + (t.last_location||'—') + '</span></div>' +
+        '<div class="lookup-row"><span class="lookup-key">Wash count</span><span class="lookup-val">' + (t.wash_count||0) + '</span></div>' +
+      '</div>';
+  } catch(e) {
+    showFeedback('error', 'Cannot reach server', 'Check your internet connection');
+  }
+}
+
+// ============================================================
+// LIVE INVENTORY — updates the KPI boxes on the right
+// ============================================================
+async function fetchInventory() {
+  try {
+    var res = await fetch(API_BASE + '/inventory');
+    var data = await res.json();
+    document.getElementById('kpi-total').textContent   = data.total     || 0;
+    document.getElementById('kpi-inuse').textContent   = data.in_use    || 0;
+    document.getElementById('kpi-laundry').textContent = data.in_laundry|| 0;
+    document.getElementById('kpi-missing').textContent = data.missing   || 0;
+  } catch(e) {
+    // Silently fail — don't distract staff with KPI errors
+  }
+}
+
+// ============================================================
+// USB READER SUPPORT
+// USB readers act like a keyboard — they type the tag ID
+// and press Enter automatically. This catches that Enter key
+// and triggers dispatch immediately, no button click needed.
+// ============================================================
+document.getElementById('tag-input').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    // If location is set, auto-dispatch. Otherwise just focus location dropdown.
+    if (getLocation()) {
+      doDispatch();
+    } else {
+      document.getElementById('location-select').focus();
+    }
+  }
+});
+
+// ============================================================
+// CLOCK
+// ============================================================
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================================
+// INIT — load inventory counts on page open
+// ============================================================
+fetchInventory();
+setInterval(fetchInventory, 30000); // Refresh every 30 seconds
+</script>
+</body>
+</html>
