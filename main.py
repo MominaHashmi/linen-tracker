@@ -337,12 +337,4 @@ def staff_page(username: str = Depends(verify_staff)):
     with open("staff.html", "r") as f:
         return HTMLResponse(content=f.read())
 
-# TEMPORARY DEBUG ROUTE — delete this after fixing
-@app.get("/debug-env")
-def debug_env():
-    return {
-        "STAFF_USER": os.getenv("STAFF_USER", "NOT SET"),
-        "STAFF_PASS": os.getenv("STAFF_PASS", "NOT SET")
-    }
-
 
