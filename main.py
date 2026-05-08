@@ -20,13 +20,6 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials # for staff login and security purposes- keep track of logs
 import secrets
 
-# TEMPORARY DEBUG ROUTE — delete this after fixing
-@app.get("/debug-env")
-def debug_env():
-    return {
-        "STAFF_USER": os.getenv("STAFF_USER", "NOT SET"),
-        "STAFF_PASS": os.getenv("STAFF_PASS", "NOT SET")
-    }
 
 # ============================================================
 # HTTP BASIC AUTH — Staff login
@@ -343,5 +336,13 @@ def staff_page(username: str = Depends(verify_staff)):
     # Read the staff.html file and serve it
     with open("staff.html", "r") as f:
         return HTMLResponse(content=f.read())
+
+# TEMPORARY DEBUG ROUTE — delete this after fixing
+@app.get("/debug-env")
+def debug_env():
+    return {
+        "STAFF_USER": os.getenv("STAFF_USER", "NOT SET"),
+        "STAFF_PASS": os.getenv("STAFF_PASS", "NOT SET")
+    }
 
 
