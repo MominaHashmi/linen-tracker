@@ -20,6 +20,14 @@ from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials # for staff login and security purposes- keep track of logs
 import secrets
 
+# TEMPORARY DEBUG ROUTE — delete this after fixing
+@app.get("/debug-env")
+def debug_env():
+    return {
+        "STAFF_USER": os.getenv("STAFF_USER", "NOT SET"),
+        "STAFF_PASS": os.getenv("STAFF_PASS", "NOT SET")
+    }
+
 # ============================================================
 # HTTP BASIC AUTH — Staff login
 # Username and password stored as Railway environment variables
