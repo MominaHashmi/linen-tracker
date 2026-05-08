@@ -25,6 +25,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import io
+sed -i '1s/^/from fastapi.responses import StreamingResponse\nfrom openpyxl import Workbook\nfrom openpyxl.styles import Font, PatternFill, Alignment, Border, Side\nfrom openpyxl.utils import get_column_letter\nimport io\n/' main.py
 
 # ============================================================
 # HTTP BASIC AUTH — Staff login
