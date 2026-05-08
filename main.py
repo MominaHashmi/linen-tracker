@@ -19,7 +19,12 @@ from fastapi import Security  # used to attach security checks to endpoints
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.security import HTTPBasic, HTTPBasicCredentials # for staff login and security purposes- keep track of logs
 import secrets
-
+#for excel sheet 
+from fastapi.responses import StreamingResponse
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+import io
 
 # ============================================================
 # HTTP BASIC AUTH — Staff login
@@ -326,6 +331,8 @@ def get_inventory():
     finally:
         db.close()  # Always close, even if something goes wrong  
 
+#-----------------------------------------------------------------------------------------------------------------------------
+
 # --- Serve the staff terminal page ---
 # GET /staff
 # Browser will prompt for username and password automatically
@@ -336,5 +343,197 @@ def staff_page(username: str = Depends(verify_staff)):
     # Read the staff.html file and serve it
     with open("staff.html", "r") as f:
         return HTMLResponse(content=f.read())
+
+#-------------------------------------------------------------------------------------------------------------------------------
+# --- Export full inventory report as Excel ---
+# GET /export
+# Downloads a formatted Excel file with 4 sheets:
+# Summary, All Towels, Missing Towels, Event History
+# Protected — requires API key
+@app.get("/export")
+def export_excel(_=Depends(verify_key)):
+    db = SessionLocal()
+    try:
+        towels  = db.query(Towel).all()
+        events  = db.query(Event).order_by(Event.created_at.desc()).all()
+        missing = db.query(Towel).filter(
+            Towel.status == "in_use",
+            Towel.dispatched_at < datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+        ).all()
+
+        total      = len(towels)
+        registered = sum(1 for t in towels if t.status == "registered")
+        in_use     = sum(1 for t in towels if t.status == "in_use")
+        in_laundry = sum(1 for t in towels if t.status == "in_laundry")
+        n_missing  = sum(1 for t in towels if t.status == "missing")
+
+        # ---- Styles ----
+        HOTEL_BLUE  = "1E3A5F"
+        WHITE       = "FFFFFF"
+        HEADER_GRAY = "F8FAFC"
+        LIGHT_BLUE  = "EFF6FF"
+        GREEN_BG    = "F0FDF4"
+        RED_BG      = "FEF2F2"
+        ORANGE_BG   = "FFFBEB"
+        BORDER_COLOR = "E2E8F0"
+        STATUS_COLORS = {
+            "in_use":     "DBEAFE",
+            "in_laundry": "FEF9C3",
+            "registered": "DCFCE7",
+            "missing":    "FEE2E2",
+        }
+        EVENT_COLORS = {
+            "DISPATCHED": "DBEAFE",
+            "RETURNED":   "DCFCE7",
+            "MISSING":    "FEE2E2",
+            "REGISTERED": "F3F4F6",
+        }
+
+        thin = Side(style='thin', color=BORDER_COLOR)
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        def hcell(ws, r, c, v, bg=HOTEL_BLUE, fg=WHITE):
+            cell = ws.cell(row=r, column=c, value=v)
+            cell.font = Font(name='Arial', bold=True, color=fg, size=11)
+            cell.fill = PatternFill('solid', start_color=bg)
+            cell.alignment = Alignment(horizontal='center', vertical='center')
+            cell.border = border
+            return cell
+
+        def dcell(ws, r, c, v, bg=WHITE, bold=False, align='left'):
+            cell = ws.cell(row=r, column=c, value=v)
+            cell.font = Font(name='Arial', bold=bold, size=10)
+            cell.fill = PatternFill('solid', start_color=bg)
+            cell.alignment = Alignment(horizontal=align, vertical='center')
+            cell.border = border
+            return cell
+
+        def title_block(ws, title, subtitle):
+            ws.row_dimensions[1].height = 36
+            ws.merge_cells('A1:H1')
+            c = ws['A1']
+            c.value = title
+            c.font = Font(name='Arial', bold=True, size=16, color=WHITE)
+            c.fill = PatternFill('solid', start_color=HOTEL_BLUE)
+            c.alignment = Alignment(horizontal='left', vertical='center')
+            ws.merge_cells('A2:H2')
+            c2 = ws['A2']
+            c2.value = subtitle
+            c2.font = Font(name='Arial', size=10, color="6B7280")
+            c2.fill = PatternFill('solid', start_color=HEADER_GRAY)
+            c2.alignment = Alignment(horizontal='left', vertical='center')
+
+        generated_at = datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+        wb = Workbook()
+        wb.remove(wb.active)
+
+        # ---- Sheet 1: Summary ----
+        ws1 = wb.create_sheet("Summary")
+        title_block(ws1, "Smart Linen Tracking — Inventory Summary", f"Generated: {generated_at}")
+        for col, h in enumerate(["Metric", "Count", "% of Total", "Notes"], 1):
+            hcell(ws1, 4, col, h)
+        rows = [
+            ("Total Towels", total,      None,        "All towels in system",              LIGHT_BLUE),
+            ("Registered",   registered, "=B6/B5",    "In inventory, not dispatched",      GREEN_BG),
+            ("In Use",       in_use,     "=B7/B5",    "Currently out in rooms",            "DBEAFE"),
+            ("In Laundry",   in_laundry, "=B8/B5",    "Returned, being washed",            ORANGE_BG),
+            ("Missing",      n_missing,  "=B9/B5",    "Over 24hrs out — investigate",      RED_BG),
+        ]
+        for i, (metric, count, pct, note, bg) in enumerate(rows):
+            r = i + 5
+            dcell(ws1, r, 1, metric, bg=bg, bold=(i==0))
+            dcell(ws1, r, 2, count,  bg=bg, align='center')
+            if pct:
+                cell = ws1.cell(row=r, column=3, value=pct)
+                cell.number_format = '0.0%'
+                cell.font = Font(name='Arial', size=10)
+                cell.fill = PatternFill('solid', start_color=bg)
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.border = border
+            else:
+                dcell(ws1, r, 3, "—", bg=bg, align='center')
+            dcell(ws1, r, 4, note, bg=bg)
+        for col, w in enumerate([22, 12, 14, 36], 1):
+            ws1.column_dimensions[get_column_letter(col)].width = w
+
+        # ---- Sheet 2: All Towels ----
+        ws2 = wb.create_sheet("All Towels")
+        title_block(ws2, "All Towels — Current Status", f"Generated: {generated_at}  |  {total} towels")
+        for col, h in enumerate(["Tag ID","Type","Status","Last Location","Wash Count","Registered"], 1):
+            hcell(ws2, 4, col, h)
+        for i, t in enumerate(towels):
+            r = i + 5
+            bg = STATUS_COLORS.get(t.status, WHITE)
+            dcell(ws2, r, 1, t.tag_id, bg=bg)
+            dcell(ws2, r, 2, (t.towel_type or "—").title(), bg=bg)
+            dcell(ws2, r, 3, t.status.replace("_"," ").upper(), bg=bg, align='center')
+            dcell(ws2, r, 4, t.last_location or "—", bg=bg)
+            dcell(ws2, r, 5, t.wash_count or 0, bg=bg, align='center')
+            dcell(ws2, r, 6, str(t.created_at or "—"), bg=bg)
+        ws2.auto_filter.ref = f"A4:F{4+len(towels)}"
+        ws2.freeze_panes = "A5"
+        for col, w in enumerate([16,14,16,18,14,20], 1):
+            ws2.column_dimensions[get_column_letter(col)].width = w
+
+        # ---- Sheet 3: Missing ----
+        ws3 = wb.create_sheet("Missing Towels")
+        title_block(ws3, "Missing Towels Report", f"Generated: {generated_at}")
+        for col, h in enumerate(["Tag ID","Type","Last Location","Dispatched At","Action"], 1):
+            hcell(ws3, 4, col, h, bg="991B1B")
+        if missing:
+            for i, t in enumerate(missing):
+                r = i + 5
+                dcell(ws3, r, 1, t.tag_id, bg=RED_BG)
+                dcell(ws3, r, 2, (t.towel_type or "—").title(), bg=RED_BG)
+                dcell(ws3, r, 3, t.last_location or "—", bg=RED_BG)
+                dcell(ws3, r, 4, str(t.dispatched_at or "—"), bg=RED_BG)
+                dcell(ws3, r, 5, "Investigate immediately", bg=RED_BG)
+        else:
+            ws3.merge_cells("A5:E5")
+            c = ws3['A5']
+            c.value = "✓  No missing towels at time of export"
+            c.font = Font(name='Arial', bold=True, size=11, color="166534")
+            c.fill = PatternFill('solid', start_color=GREEN_BG)
+            c.alignment = Alignment(horizontal='center', vertical='center')
+            ws3.row_dimensions[5].height = 32
+        ws3.auto_filter.ref = "A4:E4"
+        ws3.freeze_panes = "A5"
+        for col, w in enumerate([16,14,18,22,24], 1):
+            ws3.column_dimensions[get_column_letter(col)].width = w
+
+        # ---- Sheet 4: Events ----
+        ws4 = wb.create_sheet("Event History")
+        title_block(ws4, "Event History Log", f"Generated: {generated_at}  |  {len(events)} events")
+        for col, h in enumerate(["#","Tag ID","Event","Location","Date & Time"], 1):
+            hcell(ws4, 4, col, h)
+        for i, e in enumerate(events):
+            r = i + 5
+            bg = EVENT_COLORS.get(e.event_type, WHITE)
+            dcell(ws4, r, 1, i+1, bg=bg, align='center')
+            dcell(ws4, r, 2, e.tag_id, bg=bg)
+            dcell(ws4, r, 3, e.event_type, bg=bg, align='center')
+            dcell(ws4, r, 4, e.location or "—", bg=bg)
+            dcell(ws4, r, 5, str(e.created_at or "—"), bg=bg)
+        ws4.auto_filter.ref = f"A4:E{4+len(events)}"
+        ws4.freeze_panes = "A5"
+        for col, w in enumerate([6,16,16,18,24], 1):
+            ws4.column_dimensions[get_column_letter(col)].width = w
+
+        # ---- Stream file back to browser ----
+        # Instead of saving to disk, we write to memory and send directly
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        filename = f"linen_report_{datetime.datetime.utcnow().strftime('%Y%m%d_%H%M')}.xlsx"
+        return StreamingResponse(
+            buffer,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    finally:
+        db.close()
+
+#------------------------------------------------------------------------------------------------------------------------------------------
 
 
