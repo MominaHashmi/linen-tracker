@@ -17,6 +17,32 @@ import os  # lets us read environment variables like API_KEY
 from fastapi.security.api_key import APIKeyHeader  # handles reading the key from request headers
 from fastapi import Security  # used to attach security checks to endpoints
 from fastapi import FastAPI, HTTPException, Depends
+from fastapi.security import HTTPBasic, HTTPBasicCredentials # for staff login and security purposes- keep track of logs
+import secrets
+
+# ============================================================
+# HTTP BASIC AUTH — Staff login
+# Username and password stored as Railway environment variables
+# Set STAFF_USER and STAFF_PASS in Railway Variables tab
+# ============================================================
+security = HTTPBasic()
+
+def verify_staff(credentials: HTTPBasicCredentials = Depends(security)):
+    # secrets.compare_digest is used instead of == for security
+    # It prevents "timing attacks" — a way hackers can guess passwords
+    correct_user = secrets.compare_digest(
+        credentials.username, os.getenv("STAFF_USER", "staff")
+    )
+    correct_pass = secrets.compare_digest(
+        credentials.password, os.getenv("STAFF_PASS", "linen2026")
+    )
+    if not (correct_user and correct_pass):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Basic"}, # This triggers the browser popup
+        )
+    return credentials.username  # Returns username so we can log who did what
 
 
 # ============================================================
@@ -298,3 +324,16 @@ def get_inventory():
         }
     finally:
         db.close()  # Always close, even if something goes wrong  
+
+# --- Serve the staff terminal page ---
+# GET /staff
+# Browser will prompt for username and password automatically
+# Returns the staff HTML page if credentials are correct
+@app.get("/staff")
+def staff_page(username: str = Depends(verify_staff)):
+    from fastapi.responses import HTMLResponse
+    # Read the staff.html file and serve it
+    with open("staff.html", "r") as f:
+        return HTMLResponse(content=f.read())
+
+
