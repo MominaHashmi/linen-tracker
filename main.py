@@ -725,3 +725,20 @@ def debug_email(_=Depends(verify_key)):
     }
 
 #------------------------------------------------------------------------------------------------------------------
+
+# TEMPORARY — verbose email test
+@app.get("/test-email-verbose")
+def test_email_verbose(_=Depends(verify_key)):
+    import smtplib
+    gmail_user    = os.getenv("GMAIL_USER")
+    gmail_pass    = os.getenv("GMAIL_PASS")
+    manager_email = os.getenv("MANAGER_EMAIL")
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(gmail_user, gmail_pass)
+            server.sendmail(gmail_user, manager_email, "Subject: Test\n\nTest email")
+        return {"status": "sent"}
+    except Exception as e:
+        return {"status": "failed", "error": str(e)}
+
+#-----------------------------------------------------------------------------------------------------------------------
