@@ -1,11 +1,18 @@
-from sqlalchemy import create_engine, Column, String, Integer, DateTime, Enum
-
+from sqlalchemy import create_engine, Column, String, Integer, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import datetime
 import enum
+import os
 
-DATABASE_URL = "sqlite:///linen.db"
+# Use PostgreSQL on Railway, fall back to SQLite for local development
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///linen.db")
+
+# PostgreSQL URLs from Railway start with "postgres://" but SQLAlchemy
+# needs "postgresql://" — this line fixes that automatically
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
