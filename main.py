@@ -25,6 +25,10 @@ from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 import io
+#for emails
+import smtplib  # Python's built-in email sending library — no pip install needed
+from email.mime.text import MIMEText  # formats the email body as HTML
+from email.mime.multipart import MIMEMultipart  # allows email to have subject + body
 
 # ============================================================
 # HTTP BASIC AUTH — Staff login
@@ -84,6 +88,7 @@ def verify_key(key: str = Security(api_key_header)):
 async def lifespan(app):
     init_db()                                   # Create DB tables if they don't exist yet
     asyncio.create_task(auto_mark_missing())    # Launch background job (runs forever in background)
+    asyncio.create_task(daily_report())         #for sending daily reports to the managers
     print("Server started — background job running")
     yield                                       # Server is now live and handling requests
     print("Server shutting down")
@@ -143,7 +148,157 @@ async def auto_mark_missing():
 
         finally:
             db.close()  # Always close the DB connection, even if an error occurred
+#--------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# ============================================================
+# EMAIL ALERTS
+# Sends a daily summary email at 8am every morning
+# If missing count is 5 or more, email is flagged as urgent
+# Reads Gmail credentials from Railway environment variables
+# ============================================================
+
+def send_email(subject: str, html_body: str):
+    # Read credentials from Railway environment variables
+    gmail_user    = os.getenv("GMAIL_USER")
+    gmail_pass    = os.getenv("GMAIL_PASS")
+    manager_email = os.getenv("MANAGER_EMAIL")
+
+    # If any variable is missing, log and skip — don't crash the server
+    if not all([gmail_user, gmail_pass, manager_email]):
+        print("Email not sent — GMAIL_USER, GMAIL_PASS or MANAGER_EMAIL not set in Railway")
+        return
+
+    try:
+        # Build the email
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = gmail_user
+        msg["To"]      = manager_email
+
+        # Attach the HTML body
+        msg.attach(MIMEText(html_body, "html"))
+
+        # Connect to Gmail's SMTP server and send
+        # Port 587 is the standard secure port for sending email
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.starttls()                          # Encrypt the connection
+            server.login(gmail_user, gmail_pass)       # Log in with app password
+            server.sendmail(gmail_user, manager_email, msg.as_string())
+
+        print(f"Email sent to {manager_email}: {subject}")
+
+    except Exception as e:
+        # If email fails, log it but don't crash the server
+        print(f"Email failed: {e}")
+
+
+async def daily_report():
+    # ============================================================
+    # DAILY REPORT JOB
+    # Runs every 24 hours, timed to send at 8am
+    # Waits until 8am on first run, then sends every 24 hours
+    # ============================================================
+    while True:
+        # Calculate how many seconds until next 8am
+        now     = datetime.datetime.utcnow()  # UTC time — Railway runs on UTC
+        next_8am = now.replace(hour=8, minute=0, second=0, microsecond=0)
+
+        # If 8am already passed today, schedule for tomorrow
+        if now >= next_8am:
+            next_8am += datetime.timedelta(days=1)
+
+        # Sleep until 8am
+        seconds_until_8am = (next_8am - now).total_seconds()
+        print(f"Daily report scheduled in {seconds_until_8am/3600:.1f} hours")
+        await asyncio.sleep(seconds_until_8am)
+
+        # Fetch current inventory from database
+        db = SessionLocal()
+        try:
+            total      = db.query(Towel).count()
+            registered = db.query(Towel).filter(Towel.status == "registered").count()
+            in_use     = db.query(Towel).filter(Towel.status == "in_use").count()
+            in_laundry = db.query(Towel).filter(Towel.status == "in_laundry").count()
+            missing    = db.query(Towel).filter(Towel.status == "missing").count()
+
+            # Get list of missing towels for detail section
+            missing_towels = db.query(Towel).filter(Towel.status == "missing").all()
+
+        finally:
+            db.close()
+
+        # Decide if this is urgent (5 or more missing)
+        is_urgent = missing >= 5
+        subject   = f"🚨 URGENT — {missing} Towels Missing | Linen Report" if is_urgent else f"📊 Daily Linen Report — {datetime.datetime.utcnow().strftime('%d %b %Y')}"
+
+        # Build missing towels detail rows for the email
+        if missing_towels:
+            missing_rows = "".join([
+                f"<tr><td style='padding:8px;border-bottom:1px solid #fee2e2;font-family:monospace'>{t.tag_id}</td>"
+                f"<td style='padding:8px;border-bottom:1px solid #fee2e2'>{t.towel_type or '—'}</td>"
+                f"<td style='padding:8px;border-bottom:1px solid #fee2e2'>{t.last_location or '—'}</td></tr>"
+                for t in missing_towels
+            ])
+            missing_section = f"""
+                <h3 style='color:#991b1b;margin-top:24px'>Missing Towels</h3>
+                <table style='width:100%;border-collapse:collapse;background:#fef2f2;border-radius:8px'>
+                    <tr style='background:#991b1b;color:white'>
+                        <th style='padding:8px;text-align:left'>Tag ID</th>
+                        <th style='padding:8px;text-align:left'>Type</th>
+                        <th style='padding:8px;text-align:left'>Last Location</th>
+                    </tr>
+                    {missing_rows}
+                </table>
+            """
+        else:
+            missing_section = "<p style='color:#166534;background:#f0fdf4;padding:12px;border-radius:8px'>✓ No missing towels today</p>"
+
+        # Build the full HTML email
+        urgent_banner = f"<div style='background:#dc2626;color:white;padding:12px;border-radius:8px;margin-bottom:20px;font-weight:bold'>⚠ ALERT: {missing} towels have been missing for over 24 hours. Immediate investigation required.</div>" if is_urgent else ""
+
+        html_body = f"""
+        <div style='font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#374151'>
+            <div style='background:#1e3a5f;padding:20px;border-radius:8px 8px 0 0'>
+                <h1 style='color:white;margin:0;font-size:20px'>Smart Linen Tracking System</h1>
+                <p style='color:#93c5fd;margin:4px 0 0'>Daily Report — {datetime.datetime.utcnow().strftime('%d %B %Y')}</p>
+            </div>
+            <div style='background:white;padding:24px;border:1px solid #e5e7eb;border-radius:0 0 8px 8px'>
+                {urgent_banner}
+                <h2 style='color:#1e3a5f;margin-top:0'>Inventory Summary</h2>
+                <table style='width:100%;border-collapse:collapse'>
+                    <tr style='background:#f8fafc'>
+                        <td style='padding:10px;border:1px solid #e5e7eb'>Total Towels</td>
+                        <td style='padding:10px;border:1px solid #e5e7eb;font-weight:bold;text-align:center'>{total}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:10px;border:1px solid #e5e7eb'>Registered</td>
+                        <td style='padding:10px;border:1px solid #e5e7eb;text-align:center;color:#166534'>{registered}</td>
+                    </tr>
+                    <tr style='background:#f8fafc'>
+                        <td style='padding:10px;border:1px solid #e5e7eb'>In Use</td>
+                        <td style='padding:10px;border:1px solid #e5e7eb;text-align:center;color:#1d4ed8'>{in_use}</td>
+                    </tr>
+                    <tr>
+                        <td style='padding:10px;border:1px solid #e5e7eb'>In Laundry</td>
+                        <td style='padding:10px;border:1px solid #e5e7eb;text-align:center;color:#92400e'>{in_laundry}</td>
+                    </tr>
+                    <tr style='background:#fef2f2'>
+                        <td style='padding:10px;border:1px solid #e5e7eb;color:#991b1b;font-weight:bold'>Missing</td>
+                        <td style='padding:10px;border:1px solid #e5e7eb;text-align:center;color:#991b1b;font-weight:bold'>{missing}</td>
+                    </tr>
+                </table>
+                {missing_section}
+                <p style='color:#9ca3af;font-size:12px;margin-top:24px;border-top:1px solid #e5e7eb;padding-top:12px'>
+                    This is an automated report from your Smart Linen Tracking System.<br>
+                    View live dashboard: <a href='https://web-production-51ae0.up.railway.app'>web-production-51ae0.up.railway.app</a>
+                </p>
+            </div>
+        </div>
+        """
+
+        send_email(subject, html_body)
+
+#----------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # ============================================================
 # DATA MODEL — what a "register towel" request must include
