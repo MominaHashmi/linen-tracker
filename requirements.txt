@@ -4,3 +4,4 @@ sqlalchemy
 pydantic
 requests
 openpyxl
+psycopg2-binary
