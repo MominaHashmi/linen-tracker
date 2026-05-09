@@ -168,27 +168,25 @@ def send_email(subject: str, html_body: str):
         print("Email not sent — GMAIL_USER, GMAIL_PASS or MANAGER_EMAIL not set in Railway")
         return
 
-    try:
-        # Build the email
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = gmail_user
-        msg["To"]      = manager_email
+   try:
+    # Build the email
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = gmail_user
+    msg["To"]      = manager_email
 
-        # Attach the HTML body
-        msg.attach(MIMEText(html_body, "html"))
+    # Attach the HTML body
+    msg.attach(MIMEText(html_body, "html"))
 
-        # Connect to Gmail's SMTP server and send
-        # Port 587 is the standard secure port for sending email
+    # Connect to Gmail using SSL on port 465
     with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
         server.login(gmail_user, gmail_pass)
         server.sendmail(gmail_user, manager_email, msg.as_string())
 
-        print(f"Email sent to {manager_email}: {subject}")
+    print(f"Email sent to {manager_email}: {subject}")
 
-    except Exception as e:
-        # If email fails, log it but don't crash the server
-        print(f"Email failed: {e}")
+except Exception as e:
+    print(f"Email failed: {e}")
 
 
 async def daily_report():
