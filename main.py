@@ -793,3 +793,11 @@ def test_email_verbose(_=Depends(verify_key)):
         return {"status": "failed", "error": str(e)}
 
 #-----------------------------------------------------------------------------------------------------------------------
+
+# TEMPORARY — check which database is being used
+@app.get("/debug-db")
+def debug_db():
+    from database import DATABASE_URL
+    return {"database_url": DATABASE_URL[:30]}  # Only show first 30 chars for security
+
+#----------------------------------------------------------------------------------------------------------------------------
