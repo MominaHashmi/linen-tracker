@@ -424,6 +424,50 @@ def return_towel(tag_id: str, _=Depends(verify_key)):
     db.close()
     return result
 
+#---------------------------------------------------------------------------------------------------------------------
+
+# --- Mark a towel as clean after laundry ---
+# PATCH /towels/TOWEL-001/clean
+# Moves towel from in_laundry to registered (ready to dispatch again)
+# Blocks if towel is not currently in_laundry
+@app.patch("/towels/{tag_id}/clean")
+def clean_towel(tag_id: str, _=Depends(verify_key)):
+    db = SessionLocal()
+    try:
+        towel = db.query(Towel).filter(Towel.tag_id == tag_id).first()
+        if not towel:
+            raise HTTPException(status_code=404, detail="Towel not found")
+
+        # Guard: only towels in laundry can be marked clean
+        if towel.status != "in_laundry":
+            raise HTTPException(
+                status_code=400,
+                detail=f"Towel is {towel.status} — only in_laundry towels can be marked clean"
+            )
+
+        # Move back to registered — ready to dispatch again
+        towel.status = "registered"
+
+        # Log the clean event for audit trail
+        event = Event(
+            tag_id=tag_id,
+            event_type="CLEANED",
+            created_at=datetime.datetime.utcnow()
+        )
+        db.add(event)
+        db.commit()
+
+        return {
+            "message": "Towel marked as clean",
+            "tag_id": tag_id,
+            "status": towel.status,
+            "wash_count": towel.wash_count
+        }
+    finally:
+        db.close()
+
+#---------------------------------------------------------------------------------------------------------------------------------
+
 
 # --- Get currently missing towels ---
 # GET /missing
