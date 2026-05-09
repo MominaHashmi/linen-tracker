@@ -246,6 +246,33 @@ main{
   color:var(--dim);font-size:.78rem;
 }
 
+/* ===== REGISTER SECTION ===== */
+.register-card{
+  background:var(--card);
+  border:1px solid rgba(52,211,153,.2);
+  border-radius:14px;padding:28px;
+}
+.register-card h2{
+  font-size:.72rem;color:var(--green);
+  text-transform:uppercase;letter-spacing:.1em;
+  font-weight:600;margin-bottom:20px;
+}
+.type-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px}
+.type-btn{
+  padding:10px 6px;border-radius:8px;border:2px solid var(--border);
+  background:var(--surface);color:var(--dim);font-size:.72rem;font-weight:600;
+  font-family:'Syne',sans-serif;cursor:pointer;transition:all .15s;text-align:center;
+}
+.type-btn:hover{border-color:var(--green);color:var(--green)}
+.type-btn.selected{border-color:var(--green);background:rgba(52,211,153,.1);color:var(--green)}
+.btn-register{
+  width:100%;background:var(--green-dark);color:var(--green);
+  border:1px solid rgba(52,211,153,.25);padding:14px;
+  border-radius:10px;font-size:.85rem;font-weight:700;
+  font-family:'Syne',sans-serif;cursor:pointer;transition:all .15s;
+}
+.btn-register:hover{background:rgba(52,211,153,.15);box-shadow:0 4px 16px rgba(52,211,153,.15)}
+
 /* ===== SIDE PANEL ===== */
 .side-panel{display:flex;flex-direction:column;gap:20px}
 .side-card{
@@ -356,6 +383,38 @@ main{
       </button>
     </div>
 
+    <!-- Register New Towel Card -->
+    <!-- Only needs Tag ID + Towel Type. No location — new towels go to inventory, not a room -->
+    <div class="register-card">
+      <h2>➕ Register New Towel</h2>
+
+      <!-- Tag input for new towel — scan or type -->
+      <div class="tag-input-wrap">
+        <span class="tag-input-label" style="color:var(--green)">RFID Tag ID</span>
+        <input
+          type="text"
+          class="tag-input"
+          id="reg-tag-input"
+          placeholder="e.g. TOWEL-011"
+          autocomplete="off"
+          style="border-color:rgba(52,211,153,.3)"
+        />
+      </div>
+
+      <!-- Towel type selector — pick one before registering -->
+      <span class="location-label">Towel Type</span>
+      <div class="type-grid" id="type-grid">
+        <button class="type-btn" onclick="selectType('bath')">🛁 Bath</button>
+        <button class="type-btn" onclick="selectType('hand')">✋ Hand</button>
+        <button class="type-btn" onclick="selectType('pool')">🏊 Pool</button>
+        <button class="type-btn" onclick="selectType('face')">💆 Face</button>
+      </div>
+
+      <button class="btn-register" onclick="doRegister()">
+        ✓ Register Towel
+      </button>
+    </div>
+
     <!-- Feedback area — shows success/error after each action -->
     <div id="feedback"></div>
 
@@ -390,12 +449,11 @@ main{
     <div class="side-card">
       <h3>How to Use</h3>
       <div class="instructions">
-        <div class="inst-step"><div class="inst-num">1</div>Scan the RFID tag with the desktop reader — the Tag ID fills in automatically</div>
-        <div class="inst-step"><div class="inst-num">2</div>Or type the Tag ID manually if needed</div>
-        <div class="inst-step"><div class="inst-num">3</div>Select the location from the dropdown</div>
-        <div class="inst-step"><div class="inst-num">4</div>Press <strong>Dispatch</strong> when sending clean towels out to rooms</div>
-        <div class="inst-step"><div class="inst-num">5</div>Press <strong>Return</strong> when dirty towels come back to laundry</div>
-        <div class="inst-step"><div class="inst-num">6</div>Use <strong>Look up</strong> to check any towel's current status</div>
+        <div class="inst-step"><div class="inst-num">1</div>To <strong>register a new towel</strong> — scan or type Tag ID, select type, press Register</div>
+        <div class="inst-step"><div class="inst-num">2</div>To <strong>dispatch</strong> — scan Tag ID, select location, press Dispatch or Enter</div>
+        <div class="inst-step"><div class="inst-num">3</div>To <strong>return</strong> — scan Tag ID, press Return (no location needed)</div>
+        <div class="inst-step"><div class="inst-num">4</div>Use <strong>Look up</strong> to check any towel's current status without changing it</div>
+        <div class="inst-step"><div class="inst-num">5</div>USB reader auto-types the Tag ID and presses Enter — keep the page focused</div>
       </div>
     </div>
 
@@ -415,7 +473,7 @@ main{
 // CONFIGURATION — your Railway API
 // ============================================================
 var API_BASE = 'https://web-production-51ae0.up.railway.app';
-var API_KEY  = 'hotel-linen-2026-xK9mP'; // Replace with your actual API key from Railway
+var API_KEY  = 'your-api-key-here'; // Replace with your actual API key from Railway
 
 // ============================================================
 // HELPERS
@@ -490,6 +548,55 @@ function renderLog() {
 function clearLog() {
   logItems = [];
   renderLog();
+}
+
+// ============================================================
+// REGISTER ACTION
+// Adds a new towel to inventory — only needs Tag ID + Type
+// No location — new towels go straight to inventory
+// ============================================================
+var selectedType = '';
+
+function selectType(type) {
+  selectedType = type;
+  // Highlight the selected type button, clear others
+  document.querySelectorAll('.type-btn').forEach(function(btn) {
+    btn.classList.remove('selected');
+  });
+  event.target.classList.add('selected');
+}
+
+async function doRegister() {
+  var tag = document.getElementById('reg-tag-input').value.trim().toUpperCase();
+
+  if (!tag)          { showFeedback('error', 'No tag entered', 'Scan or type a Tag ID first'); return; }
+  if (!selectedType) { showFeedback('error', 'No type selected', 'Select Bath, Hand, Pool or Face before registering'); return; }
+
+  try {
+    var res = await fetch(API_BASE + '/towels', {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({ tag_id: tag, towel_type: selectedType })
+    });
+    var data = await res.json();
+
+    if (res.ok) {
+      showFeedback('success', 'Towel registered', 'Added to inventory as ' + selectedType + ' towel', tag);
+      addLog('REGISTERED', tag + ' (' + selectedType + ')', 'var(--green)');
+      // Clear the register form for next towel
+      document.getElementById('reg-tag-input').value = '';
+      selectedType = '';
+      document.querySelectorAll('.type-btn').forEach(function(btn){ btn.classList.remove('selected'); });
+      document.getElementById('reg-tag-input').focus();
+      fetchInventory();
+    } else if (res.status === 400) {
+      showFeedback('error', 'Already registered', 'This Tag ID already exists in the system', tag);
+    } else {
+      showFeedback('error', 'Something went wrong', data.detail || 'Unknown error');
+    }
+  } catch(e) {
+    showFeedback('error', 'Cannot reach server', 'Check your internet connection');
+  }
 }
 
 // ============================================================
