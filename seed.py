@@ -8,7 +8,7 @@
 import requests
 
 # The base URL of your running server
-BASE_URL = "http://127.0.0.1:8000"
+BASE_URL = "https://web-production-51ae0.up.railway.app"
 
 # Define 10 test towels with different types
 # Each one needs a unique tag_id — in real life this would be the RFID chip number
@@ -27,7 +27,11 @@ towels = [
 
 # Loop through the list and register each one
 for towel in towels:
-    response = requests.post(f"{BASE_URL}/towels", json=towel)
+    response = requests.post(
+    f"{BASE_URL}/towels",
+    json=towel,
+    headers={"X-API-Key": "hotel-linen-2026-xK9mP"}
+)
 
     if response.status_code == 200:
         print(f"✓ Registered {towel['tag_id']} ({towel['towel_type']})")
