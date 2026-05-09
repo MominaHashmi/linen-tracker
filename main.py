@@ -714,3 +714,14 @@ def test_email(_=Depends(verify_key)):
     return {"message": "Test email sent — check your inbox"}
 
 #---------------------------------------------------------------------------------------------------------------------------------------------------
+
+# TEMPORARY — debug email vars
+@app.get("/debug-email")
+def debug_email(_=Depends(verify_key)):
+    return {
+        "GMAIL_USER":    os.getenv("GMAIL_USER", "NOT SET"),
+        "GMAIL_PASS":    "SET" if os.getenv("GMAIL_PASS") else "NOT SET",
+        "MANAGER_EMAIL": os.getenv("MANAGER_EMAIL", "NOT SET")
+    }
+
+#------------------------------------------------------------------------------------------------------------------
