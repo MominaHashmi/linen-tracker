@@ -404,7 +404,14 @@ def return_towel(tag_id: str, _=Depends(verify_key)):
     towel = db.query(Towel).filter(Towel.tag_id == tag_id).first()
     if not towel:
         raise HTTPException(status_code=404, detail="Towel not found")
+    # Check 2 — is it in the right status to be returned? ← ADD THIS
+    if towel.status not in ["in_use", "missing"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Towel is {towel.status} — only dispatched towels can be returned"
+    )
 
+# If both checks pass, proceed with the return
     towel.status = "in_laundry"
     towel.dispatched_at = None   # Clear the timestamp so missing detection ignores this towel
 
