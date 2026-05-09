@@ -180,10 +180,9 @@ def send_email(subject: str, html_body: str):
 
         # Connect to Gmail's SMTP server and send
         # Port 587 is the standard secure port for sending email
-        with smtplib.SMTP("smtp.gmail.com", 587) as server:
-            server.starttls()                          # Encrypt the connection
-            server.login(gmail_user, gmail_pass)       # Log in with app password
-            server.sendmail(gmail_user, manager_email, msg.as_string())
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login(gmail_user, gmail_pass)
+        server.sendmail(gmail_user, manager_email, msg.as_string())
 
         print(f"Email sent to {manager_email}: {subject}")
 
