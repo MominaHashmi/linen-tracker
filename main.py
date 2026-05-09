@@ -708,3 +708,25 @@ def export_excel(
     finally:
         db.close()
 
+#----------------------------------------------------------------------------------------------------------------------------------------------
+
+# TEMPORARY — test email, delete after confirming it works
+@app.get("/test-email")
+def test_email(_=Depends(verify_key)):
+    db = SessionLocal()
+    try:
+        total      = db.query(Towel).count()
+        registered = db.query(Towel).filter(Towel.status == "registered").count()
+        in_use     = db.query(Towel).filter(Towel.status == "in_use").count()
+        in_laundry = db.query(Towel).filter(Towel.status == "in_laundry").count()
+        missing    = db.query(Towel).filter(Towel.status == "missing").count()
+    finally:
+        db.close()
+
+    send_email(
+        subject="🧪 Test — Linen Tracker Email Working",
+        html_body=f"<p>Test email from your linen tracker!</p><p>Current counts: {total} total, {in_use} in use, {missing} missing.</p>"
+    )
+    return {"message": "Test email sent — check your inbox"}
+
+#---------------------------------------------------------------------------------------------------------------------------------------------------
