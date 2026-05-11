@@ -589,8 +589,8 @@ def get_missing_towels():
 
     # Same logic as the background job, but on-demand instead of scheduled
     missing = db.query(Towel).filter(
-        Towel.status == "in_use",
-        Towel.dispatched_at < threshold
+        (Towel.status == "missing") |
+        ((Towel.status == "in_use") & (Towel.dispatched_at < threshold))
     ).all()
     db.close()
     return {"missing_count": len(missing), "towels": missing}
