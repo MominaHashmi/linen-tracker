@@ -382,8 +382,8 @@ def dispatch_towel(tag_id: str, location: Optional[str] = None, _=Depends(verify
         raise HTTPException(status_code=400, detail="Towel already dispatched — return it first")
 
     # Guard: block dispatch if towel has exceeded wash cycle limit  ← ADD HERE
-if towel.wash_count >= MAX_WASHES:
-    raise HTTPException(
+    if towel.wash_count >= MAX_WASHES:
+        raise HTTPException(
         status_code=400,
         detail=f"Towel has exceeded {MAX_WASHES} wash cycles — retire and replace it"
     )
