@@ -77,6 +77,17 @@ def verify_key(key: str = Security(api_key_header)):
             detail="Invalid or missing API key"  # Don't tell them what the right key is
         )
         
+#---------------------------------------------------------------------------------------------------------------------------------------
+# ============================================================
+# WASH CYCLE LIMIT
+# Maximum recommended washes before a towel should be retired
+# Hardcoded at 200 for POC — can be made configurable later
+# ============================================================
+MAX_WASHES = 200
+WASH_WARNING  = 150   # Less than 50 remaining — warning
+WASH_CRITICAL = 190   # Less than 10 remaining — critical
+
+#------------------------------------------------------------------------------------------------------------------------------------------
 
 # ============================================================
 # STARTUP & SHUTDOWN
@@ -314,6 +325,7 @@ def register_towel(towel: TowelCreate , _=Depends(verify_key)):
         tag_id=towel.tag_id,
         towel_type=towel.towel_type,
         status="registered",    # Fresh towels start in "registered" state
+        last_location="Store", 
         wash_count=0,
         created_at=datetime.datetime.utcnow()
     )
@@ -368,6 +380,13 @@ def dispatch_towel(tag_id: str, location: Optional[str] = None, _=Depends(verify
     # Guard: block dispatch if towel is already out in a room
     if towel.status == "in_use":
         raise HTTPException(status_code=400, detail="Towel already dispatched — return it first")
+
+    # Guard: block dispatch if towel has exceeded wash cycle limit  ← ADD HERE
+if towel.wash_count >= MAX_WASHES:
+    raise HTTPException(
+        status_code=400,
+        detail=f"Towel has exceeded {MAX_WASHES} wash cycles — retire and replace it"
+    )
 
     towel.status = "in_use"
     towel.dispatched_at = datetime.datetime.utcnow()   # Record when it left — used by missing detection
@@ -473,6 +492,89 @@ def clean_towel(tag_id: str, _=Depends(verify_key)):
     finally:
         db.close()
 
+# --- Retire a towel ---
+# PATCH /towels/{tag_id}/retire
+# Marks towel as retired — stays in database for history
+# but excluded from active inventory counts
+# Use when: towel has exceeded wash cycles, is damaged, or lost
+# Protected — requires API key
+@app.patch("/towels/{tag_id}/retire")
+def retire_towel(tag_id: str, reason: Optional[str] = None, _=Depends(verify_key)):
+    db = SessionLocal()
+    try:
+        towel = db.query(Towel).filter(Towel.tag_id == tag_id).first()
+        if not towel:
+            raise HTTPException(status_code=404, detail="Towel not found")
+
+        # Block retiring a towel that is currently dispatched
+        if towel.status == "in_use":
+            raise HTTPException(
+                status_code=400,
+                detail="Towel is currently dispatched — return it first before retiring"
+            )
+
+        # Block double retirement
+        if towel.status == "retired":
+            raise HTTPException(status_code=400, detail="Towel is already retired")
+
+        towel.status = "retired"
+
+        # Log the retirement event with optional reason
+        event = Event(
+            tag_id=tag_id,
+            event_type="RETIRED",
+            location=reason or "No reason provided",
+            created_at=datetime.datetime.utcnow()
+        )
+        db.add(event)
+        db.commit()
+
+        return {
+            "message": "Towel retired successfully",
+            "tag_id": tag_id,
+            "status": towel.status,
+            "total_washes": towel.wash_count,
+            "reason": reason or "No reason provided"
+        }
+    finally:
+        db.close()
+
+# --- Permanently delete a defective towel ---
+# DELETE /towels/{tag_id}
+# Use ONLY for defective RFID tags that cannot be scanned
+# Permanently removes towel AND all its events from database
+# Cannot be undone — use retire for normal end of life
+# Protected — requires API key
+@app.delete("/towels/{tag_id}")
+def delete_towel(tag_id: str, _=Depends(verify_key)):
+    db = SessionLocal()
+    try:
+        towel = db.query(Towel).filter(Towel.tag_id == tag_id).first()
+        if not towel:
+            raise HTTPException(status_code=404, detail="Towel not found")
+
+        # Block deletion if towel is currently dispatched
+        if towel.status == "in_use":
+            raise HTTPException(
+                status_code=400,
+                detail="Towel is currently dispatched — return it first before deleting"
+            )
+
+        # Delete all events for this towel first (foreign key cleanup)
+        db.query(Event).filter(Event.tag_id == tag_id).delete()
+
+        # Delete the towel record permanently
+        db.delete(towel)
+        db.commit()
+
+        return {
+            "message": f"Towel {tag_id} permanently deleted",
+            "tag_id": tag_id,
+            "note": "All events for this tag have also been removed"
+        }
+    finally:
+        db.close()
+
 #---------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -501,22 +603,40 @@ def get_missing_towels():
 def get_inventory():
     db = SessionLocal()
     try:
-        # Get the total number of towels in the system
-        total = db.query(Towel).count()
-
-        # Count how many towels are in each status
-        # .count() is like asking "how many rows match this filter?"
+        # Exclude retired towels from active inventory counts
+        total      = db.query(Towel).filter(Towel.status != "retired").count()
         registered = db.query(Towel).filter(Towel.status == "registered").count()
         in_use     = db.query(Towel).filter(Towel.status == "in_use").count()
         in_laundry = db.query(Towel).filter(Towel.status == "in_laundry").count()
         missing    = db.query(Towel).filter(Towel.status == "missing").count()
+        retired    = db.query(Towel).filter(Towel.status == "retired").count()
+
+        # Count towels needing attention by wash cycle status
+        wash_exceeded = db.query(Towel).filter(
+            Towel.wash_count >= MAX_WASHES,
+            Towel.status != "retired"
+        ).count()
+        wash_critical = db.query(Towel).filter(
+            Towel.wash_count >= WASH_CRITICAL,
+            Towel.wash_count < MAX_WASHES,
+            Towel.status != "retired"
+        ).count()
+        wash_warning  = db.query(Towel).filter(
+            Towel.wash_count >= WASH_WARNING,
+            Towel.wash_count < WASH_CRITICAL,
+            Towel.status != "retired"
+        ).count()
 
         return {
-            "total":      total,
-            "registered": registered,
-            "in_use":     in_use,
-            "in_laundry": in_laundry,
-            "missing":    missing
+            "total":          total,
+            "registered":     registered,
+            "in_use":         in_use,
+            "in_laundry":     in_laundry,
+            "missing":        missing,
+            "retired":        retired,
+            "wash_exceeded":  wash_exceeded,   # Needs immediate retirement
+            "wash_critical":  wash_critical,   # Less than 10 washes left
+            "wash_warning":   wash_warning,    # Less than 50 washes left
         }
     finally:
         db.close()  # Always close, even if something goes wrong  
