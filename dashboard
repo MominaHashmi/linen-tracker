@@ -174,6 +174,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .bar-fill.orange{background:var(--orange);opacity:.7}
 .bar-fill.red{background:var(--red);opacity:.7}
 .bar-fill.slate{background:var(--slate);opacity:.5}
+.bar-fill.slate{background:var(--slate);opacity:.5}
 .bar-val{font-size:.7rem;color:var(--dark);margin-left:8px;flex-shrink:0;width:32px;font-weight:500;font-family:'DM Mono',monospace}
 
 /* Dummy bar */
@@ -206,6 +207,16 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .tbl .tag-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
 .tbl .tag-orange{background:var(--orange-bg);color:var(--orange);border:1px solid var(--orange-border)}
 .tbl .tag-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.tbl .tag-slate{background:var(--slate-bg);color:var(--slate);border:1px solid #cbd5e1}
+
+/* ===== WASH ALERT BANNER ===== */
+.wash-alert{
+  border-radius:8px;padding:10px 16px;margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;font-size:.75rem;font-weight:500;
+}
+.wash-alert.exceeded{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red)}
+.wash-alert.critical{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red)}
+.wash-alert.warning{background:var(--orange-bg);border:1px solid var(--orange-border);color:var(--orange)}
 .tbl code{
   font-size:.7rem;color:var(--blue);background:var(--blue-bg);
   padding:1px 5px;border-radius:3px;font-family:'DM Mono',monospace;
@@ -332,6 +343,10 @@ var LIVE = {
   in_use: 0,
   in_laundry: 0,
   missing: 0,
+  retired: 0,
+  wash_exceeded: 0,
+  wash_critical: 0,
+  wash_warning: 0,
   towels: [],
   missingTowels: []
 };
@@ -369,11 +384,15 @@ async function fetchInventory() {
   var res = await fetch(API_BASE + '/inventory');
   if (!res.ok) throw new Error('Inventory fetch failed');
   var data = await res.json();
-  LIVE.total     = data.total     || 0;
-  LIVE.registered = data.registered || 0;
-  LIVE.in_use    = data.in_use    || 0;
-  LIVE.in_laundry = data.in_laundry || 0;
-  LIVE.missing   = data.missing   || 0;
+  LIVE.total         = data.total         || 0;
+  LIVE.registered    = data.registered    || 0;
+  LIVE.in_use        = data.in_use        || 0;
+  LIVE.in_laundry    = data.in_laundry    || 0;
+  LIVE.missing       = data.missing       || 0;
+  LIVE.retired       = data.retired       || 0;
+  LIVE.wash_exceeded = data.wash_exceeded || 0;
+  LIVE.wash_critical = data.wash_critical || 0;
+  LIVE.wash_warning  = data.wash_warning  || 0;
 }
 
 async function fetchTowels() {
@@ -410,10 +429,22 @@ function statusTag(s) {
   var map = {
     'in_use':'tag-blue','registered':'tag-green',
     'in_laundry':'tag-orange','missing':'tag-red',
+    'retired':'tag-slate',
     'IN_USE':'tag-blue','REGISTERED':'tag-green',
-    'IN_LAUNDRY':'tag-orange','MISSING':'tag-red'
+    'IN_LAUNDRY':'tag-orange','MISSING':'tag-red',
+    'RETIRED':'tag-slate'
   };
   return '<span class="tag ' + (map[s]||'tag-blue') + '">' + s.replace('_',' ') + '</span>';
+}
+
+// Wash cycle badge — shows remaining washes with colour coding
+function washBadge(washCount) {
+  var MAX = 200;
+  var remaining = MAX - washCount;
+  if (washCount >= MAX)  return '<span class="tag tag-red">EXCEEDED (' + washCount + '/' + MAX + ')</span>';
+  if (washCount >= 190)  return '<span class="tag tag-red">CRITICAL — ' + remaining + ' left</span>';
+  if (washCount >= 150)  return '<span class="tag tag-orange">WARNING — ' + remaining + ' left</span>';
+  return '<span style="font-family:\'DM Mono\',monospace;font-size:.7rem">' + washCount + ' <span style="color:var(--dim)">/ ' + MAX + '</span></span>';
 }
 
 function timeSince(isoStr) {
@@ -453,22 +484,36 @@ function overviewView() {
     return '<div class="donut-item"><div class="donut-dot" style="background:' + s.color + '"></div>' + s.label + '<span class="donut-num">' + s.num + '</span></div>';
   }).join('');
 
-  // Towel table (real data)
-  var tableRows = LIVE.towels.length === 0
-    ? '<tr><td colspan="5" class="state-empty">No towels registered yet</td></tr>'
-    : LIVE.towels.map(function(t) {
+  // Towel table (real data) — exclude retired from main view
+  var tableRows = LIVE.towels.filter(function(t){ return t.status !== 'retired'; }).length === 0
+    ? '<tr><td colspan="6" class="state-empty">No towels registered yet</td></tr>'
+    : LIVE.towels.filter(function(t){ return t.status !== 'retired'; }).map(function(t) {
         return '<tr><td><code>' + t.tag_id + '</code></td>' +
           '<td>' + (t.towel_type || '—') + '</td>' +
           '<td>' + statusTag(t.status) + '</td>' +
           '<td>' + (t.last_location || '—') + '</td>' +
-          '<td style="font-family:\'DM Mono\',monospace;font-size:.7rem">' + (t.wash_count || 0) + '</td></tr>';
+          '<td>' + washBadge(t.wash_count || 0) + '</td></tr>';
       }).join('');
 
-  return '<div class="kpi-row">' +
-    '<div class="kpi kpi-blue"><div class="kpi-label">Total Towels</div><div class="kpi-value">' + LIVE.total + '</div><div class="kpi-sub">Registered in system</div></div>' +
+  // Wash cycle alert banners
+  var washAlerts = '';
+  if (LIVE.wash_exceeded > 0) {
+    washAlerts += '<div class="wash-alert exceeded">🚨 <strong>' + LIVE.wash_exceeded + ' towel(s) exceeded 200 wash cycles</strong> — retire and replace immediately</div>';
+  }
+  if (LIVE.wash_critical > 0) {
+    washAlerts += '<div class="wash-alert critical">⚠ <strong>' + LIVE.wash_critical + ' towel(s) critical</strong> — less than 10 washes remaining before limit</div>';
+  }
+  if (LIVE.wash_warning > 0) {
+    washAlerts += '<div class="wash-alert warning">⚡ <strong>' + LIVE.wash_warning + ' towel(s) approaching limit</strong> — less than 50 washes remaining</div>';
+  }
+
+  return washAlerts +
+  '<div class="kpi-row" style="grid-template-columns:repeat(5,1fr)">' +
+    '<div class="kpi kpi-blue"><div class="kpi-label">Total Active</div><div class="kpi-value">' + LIVE.total + '</div><div class="kpi-sub">Excl. retired</div></div>' +
     '<div class="kpi kpi-green"><div class="kpi-label">In Use</div><div class="kpi-value">' + LIVE.in_use + '</div><div class="kpi-sub">Currently dispatched</div></div>' +
     '<div class="kpi kpi-orange"><div class="kpi-label">In Laundry</div><div class="kpi-value">' + LIVE.in_laundry + '</div><div class="kpi-sub">Being washed</div></div>' +
-    '<div class="kpi kpi-red"><div class="kpi-label">Missing</div><div class="kpi-value">' + LIVE.missing + '</div><div class="kpi-sub">Over 24hrs out · ' + lossRate + '% loss rate</div></div>' +
+    '<div class="kpi kpi-red"><div class="kpi-label">Missing</div><div class="kpi-value">' + LIVE.missing + '</div><div class="kpi-sub">' + lossRate + '% loss rate</div></div>' +
+    '<div class="kpi" style="border-top:3px solid var(--slate)"><div class="kpi-label">Retired</div><div class="kpi-value" style="color:var(--slate)">' + LIVE.retired + '</div><div class="kpi-sub">End of life</div></div>' +
   '</div>' +
 
   '<div class="grid-2">' +
@@ -478,7 +523,7 @@ function overviewView() {
         '<circle cx="21" cy="21" r="15.9" fill="none" stroke="#f0f2f5" stroke-width="4"/>' +
         donutRings +
         '<text x="21" y="19" text-anchor="middle" font-size="5" fill="#111827" font-weight="600" font-family="DM Sans,sans-serif">' + LIVE.total + '</text>' +
-        '<text x="21" y="25" text-anchor="middle" font-size="3.2" fill="#6b7280" font-family="DM Sans,sans-serif">total</text>' +
+        '<text x="21" y="25" text-anchor="middle" font-size="3.2" fill="#6b7280" font-family="DM Sans,sans-serif">active</text>' +
       '</svg>' +
       '<div class="donut-legend">' + legendHtml + '</div>' +
     '</div></div>' +
@@ -489,11 +534,12 @@ function overviewView() {
       '<div class="bar-row"><span class="bar-label">Laundry</span><div class="bar-track"><div class="bar-fill orange" style="width:' + ((LIVE.in_laundry/total)*100) + '%"></div></div><span class="bar-val">' + LIVE.in_laundry + '</span></div>' +
       '<div class="bar-row"><span class="bar-label">Registered</span><div class="bar-track"><div class="bar-fill green" style="width:' + ((LIVE.registered/total)*100) + '%"></div></div><span class="bar-val">' + LIVE.registered + '</span></div>' +
       '<div class="bar-row"><span class="bar-label">Missing</span><div class="bar-track"><div class="bar-fill red" style="width:' + ((LIVE.missing/total)*100) + '%"></div></div><span class="bar-val">' + LIVE.missing + '</span></div>' +
+      '<div class="bar-row"><span class="bar-label">Retired</span><div class="bar-track"><div class="bar-fill slate" style="width:' + ((LIVE.retired/(LIVE.total+LIVE.retired||1))*100) + '%"></div></div><span class="bar-val">' + LIVE.retired + '</span></div>' +
     '</div></div>' +
   '</div>' +
 
-  '<div class="panel full"><div class="panel-head"><h2>All Towels</h2><span class="pill pill-live">' + LIVE.towels.length + ' towels</span></div>' +
-  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Last Location</th><th>Washes</th></tr></thead>' +
+  '<div class="panel full"><div class="panel-head"><h2>All Active Towels</h2><span class="pill pill-live">' + LIVE.towels.filter(function(t){return t.status!=='retired';}).length + ' towels</span></div>' +
+  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Last Location</th><th>Wash Cycles</th></tr></thead>' +
   '<tbody>' + tableRows + '</tbody></table></div>';
 }
 
@@ -567,44 +613,97 @@ function lossView() {
 }
 
 // ============================================================
-// VIEW: LIFECYCLE — all dummy for now (Phase 2)
+// VIEW: LIFECYCLE — real wash cycle data from API
+// Shows wash cycle status, warnings, and towels needing attention
 // ============================================================
 function lifecycleView() {
-  var maxW = Math.max.apply(null, DUMMY.washDistribution.map(function(w){return w.count})) || 1;
+  var MAX = 200;
   var colors = ['blue','green','orange','red'];
 
-  var eolRows = LIVE.towels
-    .filter(function(t){ return t.wash_count > 5 })
-    .sort(function(a,b){ return b.wash_count - a.wash_count })
-    .slice(0,8)
+  // Count towels in each wash range using real data
+  var ranges = [
+    { label: '0–50',    min: 0,   max: 50,  count: 0, color: 'green' },
+    { label: '51–100',  min: 51,  max: 100, count: 0, color: 'blue' },
+    { label: '101–150', min: 101, max: 150, count: 0, color: 'orange' },
+    { label: '151–199', min: 151, max: 199, count: 0, color: 'red' },
+    { label: '200+',    min: 200, max: 9999,count: 0, color: 'red' },
+  ];
+  LIVE.towels.forEach(function(t) {
+    if (t.status === 'retired') return;
+    var w = t.wash_count || 0;
+    ranges.forEach(function(r) { if (w >= r.min && w <= r.max) r.count++; });
+  });
+  var maxCount = Math.max.apply(null, ranges.map(function(r){ return r.count; })) || 1;
+
+  // Towels needing attention — sorted by wash count descending
+  var attentionRows = LIVE.towels
+    .filter(function(t){ return t.status !== 'retired' && (t.wash_count || 0) >= 150; })
+    .sort(function(a,b){ return (b.wash_count||0) - (a.wash_count||0) })
     .map(function(t) {
-      var warn = t.wash_count > 250 ? 'tag-red' : t.wash_count > 150 ? 'tag-orange' : 'tag-green';
-      var label = t.wash_count > 250 ? 'REPLACE' : t.wash_count > 150 ? 'MONITOR' : 'GOOD';
-      return '<tr><td><code>' + t.tag_id + '</code></td><td>' + (t.towel_type||'—') + '</td>' +
-        '<td style="font-family:\'DM Mono\',monospace;font-size:.7rem;font-weight:600">' + t.wash_count + '</td>' +
-        '<td><span class="tag ' + warn + '">' + label + '</span></td></tr>';
+      return '<tr>' +
+        '<td><code>' + t.tag_id + '</code></td>' +
+        '<td>' + (t.towel_type||'—') + '</td>' +
+        '<td>' + statusTag(t.status) + '</td>' +
+        '<td>' + washBadge(t.wash_count||0) + '</td>' +
+        '<td>' + (t.last_location||'—') + '</td>' +
+      '</tr>';
     }).join('');
 
-  return '<div class="dummy-banner">🔴 <strong>Wash distribution charts are Phase 2</strong> — thresholds and batch tracking not yet built.</div>' +
+  // All towels by wash count
+  var allWashRows = LIVE.towels
+    .filter(function(t){ return t.status !== 'retired'; })
+    .sort(function(a,b){ return (b.wash_count||0) - (a.wash_count||0) })
+    .map(function(t) {
+      return '<tr>' +
+        '<td><code>' + t.tag_id + '</code></td>' +
+        '<td>' + (t.towel_type||'—') + '</td>' +
+        '<td>' + statusTag(t.status) + '</td>' +
+        '<td>' + washBadge(t.wash_count||0) + '</td>' +
+      '</tr>';
+    }).join('');
+
+  // Wash alert summary
+  var washAlerts = '';
+  if (LIVE.wash_exceeded > 0) washAlerts += '<div class="wash-alert exceeded">🚨 <strong>' + LIVE.wash_exceeded + ' towel(s) exceeded 200 washes</strong> — retire immediately</div>';
+  if (LIVE.wash_critical > 0) washAlerts += '<div class="wash-alert critical">⚠ <strong>' + LIVE.wash_critical + ' towel(s) critical</strong> — less than 10 washes remaining</div>';
+  if (LIVE.wash_warning  > 0) washAlerts += '<div class="wash-alert warning">⚡ <strong>' + LIVE.wash_warning + ' towel(s) warning</strong> — less than 50 washes remaining</div>';
+  if (!washAlerts) washAlerts = '<div class="wash-alert" style="background:var(--green-bg);border:1px solid var(--green-border);color:var(--green)">✓ All towels within wash cycle limits</div>';
+
+  return washAlerts +
+
+  '<div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">' +
+    '<div class="kpi" style="border-top:3px solid var(--red)"><div class="kpi-label">Exceeded (200+)</div><div class="kpi-value" style="color:var(--red)">' + LIVE.wash_exceeded + '</div><div class="kpi-sub">Retire immediately</div></div>' +
+    '<div class="kpi" style="border-top:3px solid var(--red)"><div class="kpi-label">Critical (190–199)</div><div class="kpi-value" style="color:var(--red)">' + LIVE.wash_critical + '</div><div class="kpi-sub">Less than 10 left</div></div>' +
+    '<div class="kpi kpi-orange"><div class="kpi-label">Warning (150–189)</div><div class="kpi-value">' + LIVE.wash_warning + '</div><div class="kpi-sub">Less than 50 left</div></div>' +
+    '<div class="kpi kpi-green"><div class="kpi-label">Good (0–149)</div><div class="kpi-value">' + (LIVE.total - LIVE.wash_exceeded - LIVE.wash_critical - LIVE.wash_warning) + '</div><div class="kpi-sub">Within safe range</div></div>' +
+  '</div>' +
 
   '<div class="grid-2">' +
-    '<div class="panel dummy-panel"><div class="panel-head"><h2>Wash Count Distribution</h2></div>' +
-    '<div class="bar-chart">' + DUMMY.washDistribution.map(function(w,i) {
-      return '<div class="bar-row"><span class="bar-label">' + w.range + '</span><div class="bar-track"><div class="bar-fill dummy" style="width:' + ((w.count/maxW)*100) + '%"></div></div><span class="bar-val dummy">' + w.count + '</span></div>';
+    '<div class="panel"><div class="panel-head"><h2>Wash Count Distribution</h2><span class="pill pill-live">● Live</span></div>' +
+    '<div class="bar-chart">' + ranges.map(function(r) {
+      return '<div class="bar-row"><span class="bar-label">' + r.label + '</span><div class="bar-track"><div class="bar-fill ' + r.color + '" style="width:' + ((r.count/maxCount)*100) + '%"></div></div><span class="bar-val">' + r.count + '</span></div>';
     }).join('') + '</div></div>' +
 
     '<div class="panel"><div class="panel-head"><h2>Wash Count — Your Towels</h2><span class="pill pill-live">● Live</span></div>' +
     (LIVE.towels.length === 0
       ? '<div class="state-empty">No towels registered yet</div>'
-      : '<div class="bar-chart">' + LIVE.towels.slice(0,6).map(function(t,i) {
-          return '<div class="bar-row"><span class="bar-label" style="width:90px;font-size:.68rem">' + t.tag_id.slice(-7) + '</span><div class="bar-track"><div class="bar-fill ' + colors[i%4] + '" style="width:' + Math.max(((t.wash_count||0)/20)*100,4) + '%"></div></div><span class="bar-val">' + (t.wash_count||0) + '</span></div>';
+      : '<div class="bar-chart">' + LIVE.towels.filter(function(t){return t.status!=='retired';}).slice(0,6).map(function(t,i) {
+          var pct = Math.max(((t.wash_count||0)/MAX)*100, 4);
+          var col = (t.wash_count||0) >= MAX ? 'red' : (t.wash_count||0) >= 150 ? 'orange' : colors[i%2 === 0 ? 0 : 1];
+          return '<div class="bar-row"><span class="bar-label" style="width:90px;font-size:.68rem">' + t.tag_id.slice(-8) + '</span><div class="bar-track"><div class="bar-fill ' + col + '" style="width:' + pct + '%"></div></div><span class="bar-val">' + (t.wash_count||0) + '</span></div>';
         }).join('') + '</div>') +
     '</div>' +
   '</div>' +
 
-  '<div class="panel full"><div class="panel-head"><h2>Towels by Wash Count</h2><span class="pill pill-live">● Live</span></div>' +
-  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Wash Count</th><th>Status</th></tr></thead>' +
-  '<tbody>' + (eolRows || '<tr><td colspan="4" class="state-empty">No wear data yet — dispatch some towels first</td></tr>') + '</tbody></table></div>';
+  (attentionRows
+    ? '<div class="panel full"><div class="panel-head"><h2>⚠ Towels Needing Attention</h2><span class="pill" style="background:var(--red-bg);color:var(--red);border-color:var(--red-border)">' + (LIVE.wash_exceeded + LIVE.wash_critical + LIVE.wash_warning) + ' towels</span></div>' +
+      '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Wash Cycles</th><th>Last Location</th></tr></thead>' +
+      '<tbody>' + attentionRows + '</tbody></table></div>'
+    : '') +
+
+  '<div class="panel full"><div class="panel-head"><h2>All Towels by Wash Count</h2><span class="pill pill-live">● Live</span></div>' +
+  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Wash Cycles</th></tr></thead>' +
+  '<tbody>' + (allWashRows || '<tr><td colspan="4" class="state-empty">No towels yet</td></tr>') + '</tbody></table></div>';
 }
 
 // ============================================================
