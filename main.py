@@ -865,4 +865,13 @@ def export_excel(
 
 #----------------------------------------------------------------------------------------------------------------------------------------------
 
+# --- Serve the manager dashboard ---
+# GET /dashboard
+# Protected by HTTP Basic Auth same as staff
+@app.get("/dashboard")
+def dashboard_page(username: str = Depends(verify_staff)):
+    from fastapi.responses import HTMLResponse
+    with open("dashboard.html", "r") as f:
+        return HTMLResponse(content=f.read())
 
+#-------------------------------------------------------------------------------------------------------------------------------------------------
