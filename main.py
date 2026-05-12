@@ -650,8 +650,11 @@ def get_inventory():
 @app.get("/staff")
 def staff_page(username: str = Depends(verify_staff)):
     from fastapi.responses import HTMLResponse
-    # Read the staff.html file and serve it
-    with open("staff.html", "r") as f:
+    from fastapi.responses import HTMLResponse
+    import os
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(base_dir, "staff.html")
+    with open(file_path, "r") as f:
         return HTMLResponse(content=f.read())
 
 #-------------------------------------------------------------------------------------------------------------------------------
