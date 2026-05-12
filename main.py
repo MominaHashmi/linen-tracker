@@ -879,6 +879,14 @@ def dashboard_page(username: str = Depends(verify_staff)):
         return HTMLResponse(content=f.read())
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 
-
+# TEMPORARY — debug file paths
+@app.get("/debug-paths")
+def debug_paths():
+    import os
+    return {
+        "cwd": os.getcwd(),
+        "abspath": os.path.abspath(__file__),
+        "files": os.listdir(os.getcwd())
+    }
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------
