@@ -173,6 +173,44 @@ main{
 }
 .btn-missing:hover{color:var(--red);border-color:var(--red);background:rgba(248,113,113,.05)}
 
+/* Retire and delete buttons */
+.btn-retire{
+  width:100%;margin-top:10px;
+  background:transparent;color:var(--orange);
+  border:1px solid var(--orange);font-size:.78rem;
+  padding:10px;border-radius:10px;
+  font-family:'Syne',sans-serif;font-weight:600;cursor:pointer;transition:all .15s;
+}
+.btn-retire:hover{background:rgba(251,191,36,.08);box-shadow:0 2px 8px rgba(251,191,36,.15)}
+
+.btn-delete{
+  width:100%;margin-top:8px;
+  background:transparent;color:var(--red);
+  border:1px solid rgba(248,113,113,.4);font-size:.75rem;
+  padding:8px;border-radius:10px;
+  font-family:'Syne',sans-serif;font-weight:600;cursor:pointer;transition:all .15s;
+}
+.btn-delete:hover{background:rgba(248,113,113,.08);border-color:var(--red)}
+
+/* Confirmation dialog overlay */
+.confirm-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);
+  display:flex;align-items:center;justify-content:center;
+  z-index:1000;animation:fadeIn .2s ease;
+}
+.confirm-box{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:14px;padding:28px;max-width:380px;width:90%;
+}
+.confirm-box h3{font-size:.95rem;color:var(--white);margin-bottom:8px}
+.confirm-box p{font-size:.8rem;color:var(--dim);line-height:1.5;margin-bottom:20px}
+.confirm-tag{font-family:'DM Mono',monospace;color:var(--red);font-size:.85rem;font-weight:600}
+.confirm-btns{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.confirm-yes{padding:10px;border-radius:8px;background:var(--red);color:#fff;border:none;cursor:pointer;font-family:'Syne',sans-serif;font-weight:700;font-size:.82rem}
+.confirm-no{padding:10px;border-radius:8px;background:transparent;color:var(--dim);border:1px solid var(--border);cursor:pointer;font-family:'Syne',sans-serif;font-size:.82rem}
+.confirm-yes:hover{background:#ef4444}
+.confirm-no:hover{color:var(--white)}
+
 /* ===== FEEDBACK TOAST ===== */
 .toast{
   border-radius:12px;padding:16px 20px;
@@ -353,9 +391,11 @@ main{
 
       <!-- Location dropdown -->
       <div class="location-wrap">
-        <span class="location-label">Dispatching To (Room / Area)</span>
+        <span class="location-label">Location</span>
         <select class="location-select" id="location-select">
-          <option value="">— Where is this towel going? —</option>
+          <option value="">— Select location —</option>
+          <option value="Laundry Exit">Laundry Exit</option>
+          <option value="Laundry Entry">Laundry Entry</option>
           <option value="Floor 1">Floor 1</option>
           <option value="Floor 2">Floor 2</option>
           <option value="Floor 3">Floor 3</option>
@@ -376,10 +416,35 @@ main{
           ↙ Return to Laundry
         </button>
       </div>
+      <!-- Secondary actions -->
+      <button class="btn btn-missing" onclick="doClean()" style="margin-top:10px;color:var(--orange);border-color:var(--orange)">
+        ✓ Mark as Clean
+      </button>
       <button class="btn btn-missing" onclick="doLookup()">
         🔍 Look up tag status
       </button>
+      <!-- Retire — soft end of life, keeps history in database -->
+      <button class="btn-retire" onclick="doRetire()">
+        📦 Retire Towel — end of wash life
+      </button>
+      <!-- Delete — permanent, only for defective RFID tags -->
+      <button class="btn-delete" onclick="doDelete()">
+        🗑 Delete Defective Tag — permanent, cannot undo
+      </button>
     </div>
+
+<!-- Confirmation dialog — shown before retire or delete -->
+<div class="confirm-overlay" id="confirm-overlay" style="display:none">
+  <div class="confirm-box">
+    <h3 id="confirm-title">Are you sure?</h3>
+    <p id="confirm-msg">This action cannot be undone.</p>
+    <p class="confirm-tag" id="confirm-tag"></p>
+    <div class="confirm-btns" style="margin-top:16px">
+      <button class="confirm-yes" id="confirm-yes-btn">Yes, proceed</button>
+      <button class="confirm-no" onclick="closeConfirm()">Cancel</button>
+    </div>
+  </div>
+</div>
 
     <!-- Register New Towel Card -->
     <!-- Only needs Tag ID + Towel Type. No location — new towels go to inventory, not a room -->
@@ -448,10 +513,11 @@ main{
       <h3>How to Use</h3>
       <div class="instructions">
         <div class="inst-step"><div class="inst-num">1</div>To <strong>register a new towel</strong> — scan or type Tag ID, select type, press Register</div>
-        <div class="inst-step"><div class="inst-num">2</div>To <strong>dispatch</strong> — scan Tag ID, select location, press Dispatch or Enter</div>
-        <div class="inst-step"><div class="inst-num">3</div>To <strong>return</strong> — scan Tag ID, press Return (no location needed)</div>
-        <div class="inst-step"><div class="inst-num">4</div>Use <strong>Look up</strong> to check any towel's current status without changing it</div>
-        <div class="inst-step"><div class="inst-num">5</div>USB reader auto-types the Tag ID and presses Enter — keep the page focused</div>
+        <div class="inst-step"><div class="inst-num">2</div>To <strong>dispatch</strong> — scan Tag ID, select location, press Dispatch to Room</div>
+        <div class="inst-step"><div class="inst-num">3</div>To <strong>return</strong> — scan Tag ID, press Return to Laundry</div>
+        <div class="inst-step"><div class="inst-num">4</div>To <strong>clean</strong> — scan Tag ID after washing, press Mark as Clean</div>
+        <div class="inst-step"><div class="inst-num">5</div>To <strong>retire</strong> — scan Tag ID, press Retire when towel reaches end of wash life (200 cycles)</div>
+        <div class="inst-step"><div class="inst-num">6</div>To <strong>delete</strong> — type Tag ID manually (can't scan defective tag), press Delete. Use only for broken RFID chips</div>
       </div>
     </div>
 
@@ -471,7 +537,7 @@ main{
 // CONFIGURATION — your Railway API
 // ============================================================
 var API_BASE = 'https://web-production-51ae0.up.railway.app';
-var API_KEY  = 'hotel-linen-2026-xK9mP'; // Replace with your actual API key from Railway
+var API_KEY  = 'your-api-key-here'; // Replace with your actual API key from Railway
 
 // ============================================================
 // HELPERS
@@ -687,6 +753,110 @@ async function doLookup() {
 }
 
 // ============================================================
+// CONFIRM DIALOG
+// Shows a popup before retire or delete to prevent accidents
+// ============================================================
+var confirmCallback = null;
+
+function showConfirm(title, msg, tag, yesLabel, callback) {
+  document.getElementById('confirm-title').textContent    = title;
+  document.getElementById('confirm-msg').textContent      = msg;
+  document.getElementById('confirm-tag').textContent      = tag;
+  document.getElementById('confirm-yes-btn').textContent  = yesLabel;
+  document.getElementById('confirm-overlay').style.display = 'flex';
+  confirmCallback = callback;
+}
+function closeConfirm() {
+  document.getElementById('confirm-overlay').style.display = 'none';
+  confirmCallback = null;
+}
+document.getElementById('confirm-yes-btn').addEventListener('click', function() {
+  closeConfirm();
+  if (confirmCallback) confirmCallback();
+});
+
+// ============================================================
+// CLEAN ACTION
+// Marks towel as clean after laundry — moves back to registered
+// ============================================================
+async function doClean() {
+  var tag = getTag();
+  if (!tag) { showFeedback('error', 'No tag entered', 'Scan or type a Tag ID first'); return; }
+  try {
+    var res = await fetch(API_BASE + '/towels/' + tag + '/clean', { method: 'PATCH', headers: authHeaders() });
+    var data = await res.json();
+    if (res.ok) {
+      showFeedback('success', 'Marked as clean', 'Towel is ready to dispatch again · Wash #' + data.wash_count, tag);
+      addLog('CLEANED', tag + ' → Ready', 'var(--orange)');
+      clearInput();
+      fetchInventory();
+    } else {
+      showFeedback('error', 'Cannot clean', data.detail, tag);
+    }
+  } catch(e) {
+    showFeedback('error', 'Cannot reach server', 'Check your internet connection');
+  }
+}
+
+// ============================================================
+// RETIRE ACTION
+// Soft end-of-life — stays in database for history
+// Use when towel reaches 200 wash cycles or is damaged
+// ============================================================
+async function doRetire() {
+  var tag = getTag();
+  if (!tag) { showFeedback('error', 'No tag entered', 'Scan or type a Tag ID first'); return; }
+  showConfirm(
+    'Retire this towel?',
+    'Marks towel as end-of-life. Removed from active inventory but kept in history.',
+    tag, 'Yes, Retire Towel',
+    async function() {
+      try {
+        var res = await fetch(API_BASE + '/towels/' + tag + '/retire', { method: 'PATCH', headers: authHeaders() });
+        var data = await res.json();
+        if (res.ok) {
+          showFeedback('success', 'Towel retired', 'Removed from active inventory · Total washes: ' + data.total_washes, tag);
+          addLog('RETIRED', tag + ' · ' + data.total_washes + ' washes', 'var(--orange)');
+          clearInput(); fetchInventory();
+        } else {
+          showFeedback('error', 'Cannot retire', data.detail, tag);
+        }
+      } catch(e) { showFeedback('error', 'Cannot reach server', 'Check your internet connection'); }
+    }
+  );
+}
+
+// ============================================================
+// DELETE ACTION
+// Permanently removes defective tag — cannot be undone
+// Type Tag ID manually — broken chips cannot be scanned
+// ============================================================
+async function doDelete() {
+  var tag = getTag();
+  if (!tag) { showFeedback('error', 'No tag entered', 'Type the Tag ID manually for defective tags'); return; }
+  showConfirm(
+    'Permanently delete this tag?',
+    '⚠ Cannot be undone. All history erased. Only use for broken RFID chips that cannot be scanned.',
+    tag, 'Yes, Delete Permanently',
+    async function() {
+      try {
+        var res = await fetch(API_BASE + '/towels/' + tag, { method: 'DELETE', headers: authHeaders() });
+        var data = await res.json();
+        if (res.ok) {
+          showFeedback('success', 'Tag deleted permanently', 'All records removed from system', tag);
+          addLog('DELETED', tag + ' — permanent', 'var(--red)');
+          clearInput(); fetchInventory();
+        } else if (res.status === 404) {
+          showFeedback('error', 'Tag not found', 'This Tag ID does not exist', tag);
+        } else {
+          showFeedback('error', 'Cannot delete', data.detail, tag);
+        }
+      } catch(e) { showFeedback('error', 'Cannot reach server', 'Check your internet connection'); }
+    }
+  );
+}
+
+// ============================================================
 // LIVE INVENTORY — updates the KPI boxes on the right
 // ============================================================
 async function fetchInventory() {
@@ -737,20 +907,3 @@ setInterval(fetchInventory, 30000); // Refresh every 30 seconds
 </script>
 </body>
 </html>
-
-#----------------------------------------------------------------------------------------------------------------------
-
-cat >> main.py << 'EOF'
-
-# TEMPORARY — debug file paths
-@app.get("/debug-paths")
-def debug_paths():
-    import os
-    return {
-        "cwd": os.getcwd(),
-        "files_in_cwd": os.listdir(os.getcwd()),
-        "abspath": os.path.abspath(__file__)
-    }
-EOF
-
-#----------------------------------------------------------------------------------------------------------------------------
