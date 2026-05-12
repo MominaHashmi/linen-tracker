@@ -764,11 +764,11 @@ def export_excel(
         for col, h in enumerate(["Metric","Count","% of Total","Notes"], 1):
             hcell(ws1, 4, col, h)
         rows = [
-            ("Total Towels", total_all,   None,       "All towels in system",           LIGHT_BLUE),
-            ("Registered",   registered,  "=B6/B5",   "In inventory, not dispatched",   GREEN_BG),
-            ("In Use",       in_use,      "=B7/B5",   "Currently out in rooms",         "DBEAFE"),
-            ("In Laundry",   in_laundry,  "=B8/B5",   "Returned, being washed",         ORANGE_BG),
-            ("Missing",      n_missing,   "=B9/B5",   "Over 24hrs — investigate",       RED_BG),
+            ("Total Towels", total_all,  None,                                    "All towels in system",           LIGHT_BLUE),
+            ("Registered",   registered, registered/total_all  if total_all else 0, "In inventory, not dispatched", GREEN_BG),
+            ("In Use",       in_use,     in_use/total_all       if total_all else 0, "Currently out in rooms",       "DBEAFE"),
+            ("In Laundry",   in_laundry, in_laundry/total_all   if total_all else 0, "Returned, being washed",       ORANGE_BG),
+            ("Missing",      n_missing,  n_missing/total_all    if total_all else 0, "Over 24hrs — investigate",     RED_BG),
         ]
         for i, (metric, count, pct, note, bg) in enumerate(rows):
             r = i + 5
@@ -875,3 +875,19 @@ def dashboard_page(username: str = Depends(verify_staff)):
         return HTMLResponse(content=f.read())
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------
+
+# TEMPORARY — fix existing towels with no location to Store
+# DELETE after running once
+@app.get("/fix-locations")
+def fix_locations(_=Depends(verify_key)):
+    db = SessionLocal()
+    try:
+        towels = db.query(Towel).filter(Towel.last_location == None).all()
+        for t in towels:
+            t.last_location = "Store"
+        db.commit()
+        return {"message": f"Updated {len(towels)} towels to Store"}
+    finally:
+        db.close()
+
+#--------------------------------------------------------------------------------------------------------------------------------------------------------------
