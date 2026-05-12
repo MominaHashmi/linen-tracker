@@ -876,18 +876,6 @@ def dashboard_page(username: str = Depends(verify_staff)):
 
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 
-# TEMPORARY — fix existing towels with no location to Store
-# DELETE after running once
-@app.get("/fix-locations")
-def fix_locations(_=Depends(verify_key)):
-    db = SessionLocal()
-    try:
-        towels = db.query(Towel).filter(Towel.last_location == None).all()
-        for t in towels:
-            t.last_location = "Store"
-        db.commit()
-        return {"message": f"Updated {len(towels)} towels to Store"}
-    finally:
-        db.close()
+
 
 #--------------------------------------------------------------------------------------------------------------------------------------------------------------
