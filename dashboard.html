@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Linen Tracking — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#f4f5f7;
+  --surface:#ffffff;
+  --card:#ffffff;
+  --border:#e4e7ec;
+  --border-light:#f0f2f5;
+  --text:#374151;
+  --dim:#6b7280;
+  --dark:#111827;
+  --white:#ffffff;
+
+  /* Live data colors */
+  --blue:#2563eb;--blue-bg:#eff6ff;--blue-border:#bfdbfe;
+  --green:#059669;--green-bg:#f0fdf4;--green-border:#a7f3d0;
+  --orange:#d97706;--orange-bg:#fffbeb;--orange-border:#fde68a;
+  --red:#dc2626;--red-bg:#fef2f2;--red-border:#fecaca;
+  --slate:#475569;--slate-bg:#f8fafc;
+
+  /* Dummy data color — clearly marked placeholder */
+  --dummy:#dc2626;
+  --dummy-bg:#fff5f5;
+  --dummy-border:#fecaca;
+}
+html{font-size:14px}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ===== LAYOUT ===== */
+.app{display:grid;grid-template-columns:220px 1fr;grid-template-rows:56px 1fr;min-height:100vh}
+
+/* Sidebar */
+.sidebar{
+  grid-row:1/3;background:var(--dark);
+  padding:0;display:flex;flex-direction:column;
+}
+.sidebar-brand{
+  padding:20px 20px 18px;
+  border-bottom:1px solid rgba(255,255,255,.07);margin-bottom:8px
+}
+.sidebar-brand h1{
+  font-size:.88rem;color:#fff;font-weight:600;line-height:1.4;
+  letter-spacing:-.01em;
+}
+.sidebar-brand p{
+  font-size:.62rem;color:rgba(255,255,255,.35);
+  letter-spacing:.1em;text-transform:uppercase;margin-top:3px
+}
+.sidebar-nav{flex:1;padding:4px 10px}
+.sidebar-nav a{
+  display:flex;align-items:center;gap:9px;padding:8px 10px;
+  border-radius:6px;font-size:.78rem;color:rgba(255,255,255,.45);
+  text-decoration:none;transition:all .15s;margin-bottom:1px;cursor:pointer;
+  font-weight:500;
+}
+.sidebar-nav a:hover{background:rgba(255,255,255,.06);color:rgba(255,255,255,.8)}
+.sidebar-nav a.active{background:rgba(37,99,235,.3);color:#93c5fd}
+.sidebar-nav a .icon{width:16px;text-align:center;font-size:.9rem;flex-shrink:0}
+.sidebar-status{
+  padding:14px 20px;border-top:1px solid rgba(255,255,255,.07);
+}
+.sidebar-status .dot{
+  display:inline-block;width:7px;height:7px;border-radius:50%;
+  background:#34d399;margin-right:6px;animation:blink 2s infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.sidebar-status span{font-size:.7rem;color:rgba(255,255,255,.35)}
+.sidebar-status .api-url{
+  font-size:.62rem;color:rgba(255,255,255,.2);
+  margin-top:4px;display:block;word-break:break-all;font-family:'DM Mono',monospace;
+}
+
+/* Topbar */
+.topbar{
+  background:var(--surface);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;padding:0 24px;
+}
+.topbar-title{font-size:.88rem;color:var(--dark);font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.topbar-time{font-size:.72rem;color:var(--dim);font-family:'DM Mono',monospace}
+.live-badge{
+  display:flex;align-items:center;gap:5px;
+  padding:3px 10px;border-radius:20px;font-size:.68rem;font-weight:600;
+  background:var(--green-bg);color:var(--green);border:1px solid var(--green-border);
+}
+.live-badge .dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite}
+.refresh-btn{
+  padding:4px 10px;border-radius:6px;font-size:.72rem;
+  border:1px solid var(--border);background:var(--surface);color:var(--dim);
+  cursor:pointer;transition:all .15s;font-family:'DM Sans',sans-serif;
+}
+.refresh-btn:hover{background:var(--bg);color:var(--dark)}
+
+/* Loading state */
+.loading-bar{
+  height:2px;background:var(--blue);
+  animation:loading .8s ease infinite;
+  transform-origin:left;
+}
+@keyframes loading{0%{transform:scaleX(0)}50%{transform:scaleX(.7)}100%{transform:scaleX(1)}}
+
+/* Main */
+.main{padding:20px 24px;overflow-y:auto;background:var(--bg)}
+
+/* ===== DUMMY DATA BANNER ===== */
+.dummy-banner{
+  display:flex;align-items:center;gap:10px;
+  background:var(--dummy-bg);border:1px solid var(--dummy-border);
+  border-radius:8px;padding:10px 16px;margin-bottom:18px;
+  font-size:.75rem;color:var(--dummy);font-weight:500;
+}
+.dummy-banner strong{font-weight:600}
+
+/* ===== KPI CARDS ===== */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.kpi{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:16px 18px;transition:box-shadow .2s;
+}
+.kpi:hover{box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.kpi-label{font-size:.67rem;color:var(--dim);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;font-weight:500}
+.kpi-value{font-size:1.7rem;font-weight:600;color:var(--dark);line-height:1;letter-spacing:-.02em}
+.kpi-sub{font-size:.7rem;color:var(--dim);margin-top:5px}
+.kpi-blue .kpi-value{color:var(--blue)}
+.kpi-green .kpi-value{color:var(--green)}
+.kpi-orange .kpi-value{color:var(--orange)}
+.kpi-red .kpi-value{color:var(--red)}
+.kpi-blue{border-top:3px solid var(--blue)}
+.kpi-green{border-top:3px solid var(--green)}
+.kpi-orange{border-top:3px solid var(--orange)}
+.kpi-red{border-top:3px solid var(--red)}
+
+/* ===== SECTION GRID ===== */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.grid-3{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px}
+.full{margin-bottom:14px}
+
+/* ===== PANELS ===== */
+.panel{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:18px;overflow:hidden;
+}
+.panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.panel-head h2{font-size:.82rem;color:var(--dark);font-weight:600}
+.pill{
+  font-size:.63rem;padding:2px 8px;border-radius:10px;
+  background:var(--bg);color:var(--dim);border:1px solid var(--border);font-weight:500;
+}
+.pill-live{background:var(--green-bg);color:var(--green);border-color:var(--green-border)}
+
+/* Dummy panel marker */
+.panel.dummy-panel{border-color:var(--dummy-border);border-style:dashed}
+.panel.dummy-panel .panel-head h2::after{
+  content:'  PHASE 2';font-size:.58rem;color:var(--dummy);
+  background:var(--dummy-bg);padding:1px 6px;border-radius:4px;
+  margin-left:8px;font-weight:600;letter-spacing:.05em;vertical-align:middle;
+}
+
+/* ===== BAR CHARTS ===== */
+.bar-chart{display:flex;flex-direction:column;gap:8px}
+.bar-row{display:flex;align-items:center;gap:10px}
+.bar-label{width:76px;font-size:.72rem;color:var(--dim);text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:20px;background:var(--bg);border-radius:4px;overflow:hidden;border:1px solid var(--border-light)}
+.bar-fill{height:100%;border-radius:3px;transition:width 1s ease}
+.bar-fill.blue{background:var(--blue);opacity:.7}
+.bar-fill.green{background:var(--green);opacity:.7}
+.bar-fill.orange{background:var(--orange);opacity:.7}
+.bar-fill.red{background:var(--red);opacity:.7}
+.bar-fill.slate{background:var(--slate);opacity:.5}
+.bar-fill.slate{background:var(--slate);opacity:.5}
+.bar-val{font-size:.7rem;color:var(--dark);margin-left:8px;flex-shrink:0;width:32px;font-weight:500;font-family:'DM Mono',monospace}
+
+/* Dummy bar */
+.bar-fill.dummy{background:var(--dummy);opacity:.35}
+.bar-val.dummy{color:var(--dummy)}
+
+/* ===== DONUT ===== */
+.donut-wrap{display:flex;align-items:center;justify-content:center;gap:28px;padding:4px 0}
+.donut-svg{width:140px;height:140px;flex-shrink:0}
+.donut-legend{display:flex;flex-direction:column;gap:7px}
+.donut-item{display:flex;align-items:center;gap:7px;font-size:.75rem;color:var(--dim)}
+.donut-dot{width:9px;height:9px;border-radius:2px;flex-shrink:0}
+.donut-num{font-weight:600;color:var(--dark);margin-left:auto;padding-left:12px;font-family:'DM Mono',monospace;font-size:.72rem}
+
+/* ===== TABLE ===== */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{
+  text-align:left;padding:7px 10px;font-size:.65rem;color:var(--dim);
+  text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);
+  font-weight:600;background:var(--bg);
+}
+.tbl td{padding:8px 10px;font-size:.76rem;border-bottom:1px solid var(--border-light);color:var(--text)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:var(--bg)}
+.tbl .tag{
+  display:inline-block;padding:2px 7px;border-radius:4px;font-size:.65rem;font-weight:600;
+  letter-spacing:.03em;
+}
+.tbl .tag-blue{background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-border)}
+.tbl .tag-green{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
+.tbl .tag-orange{background:var(--orange-bg);color:var(--orange);border:1px solid var(--orange-border)}
+.tbl .tag-red{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
+.tbl .tag-slate{background:var(--slate-bg);color:var(--slate);border:1px solid #cbd5e1}
+
+/* ===== WASH ALERT BANNER ===== */
+.wash-alert{
+  border-radius:8px;padding:10px 16px;margin-bottom:14px;
+  display:flex;align-items:center;gap:10px;font-size:.75rem;font-weight:500;
+}
+.wash-alert.exceeded{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red)}
+.wash-alert.critical{background:var(--red-bg);border:1px solid var(--red-border);color:var(--red)}
+.wash-alert.warning{background:var(--orange-bg);border:1px solid var(--orange-border);color:var(--orange)}
+.tbl code{
+  font-size:.7rem;color:var(--blue);background:var(--blue-bg);
+  padding:1px 5px;border-radius:3px;font-family:'DM Mono',monospace;
+}
+
+/* ===== LIVE FEED ===== */
+.feed{max-height:280px;overflow-y:auto}
+.feed-item{
+  display:flex;align-items:center;gap:9px;padding:7px 0;
+  border-bottom:1px solid var(--border-light);font-size:.73rem;
+}
+.feed-item:last-child{border-bottom:none}
+.feed-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.feed-item .time{color:var(--dim);font-size:.65rem;margin-left:auto;flex-shrink:0;font-family:'DM Mono',monospace}
+
+/* ===== ERROR / EMPTY STATES ===== */
+.state-empty{
+  text-align:center;padding:32px 20px;color:var(--dim);font-size:.8rem;
+}
+.state-error{
+  text-align:center;padding:20px;color:var(--red);font-size:.78rem;
+  background:var(--red-bg);border-radius:8px;border:1px solid var(--red-border);
+}
+
+/* ===== EXPORT VIEW ===== */
+.export-toolbar{
+  display:flex;align-items:center;justify-content:space-between;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:14px 18px;margin-bottom:16px;
+}
+.export-toolbar p{font-size:.78rem;color:var(--dim)}
+.export-toolbar strong{color:var(--dark)}
+.btn-download{
+  display:flex;align-items:center;gap:7px;
+  padding:9px 18px;border-radius:8px;
+  background:var(--blue);color:#fff;
+  border:none;cursor:pointer;
+  font-size:.78rem;font-weight:600;font-family:'DM Sans',sans-serif;
+  transition:all .15s;text-decoration:none;
+}
+.btn-download:hover{background:#1d4ed8;box-shadow:0 2px 8px rgba(37,99,235,.3)}
+.btn-download:disabled{background:var(--dim);cursor:not-allowed}
+.export-tabs{
+  display:flex;gap:4px;margin-bottom:14px;
+  background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:5px;
+}
+.export-tab{
+  flex:1;padding:7px 10px;border-radius:7px;border:none;
+  background:transparent;color:var(--dim);font-size:.75rem;
+  font-family:'DM Sans',sans-serif;font-weight:500;cursor:pointer;
+  transition:all .15s;text-align:center;
+}
+.export-tab.active{background:var(--blue);color:#fff;font-weight:600}
+.export-tab:hover:not(.active){background:var(--bg);color:var(--dark)}
+.export-sheet{display:none}
+.export-sheet.active{display:block}
+.sheet-table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border)}
+
+@media(max-width:1100px){.kpi-row{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+@media(max-width:768px){
+  .app{grid-template-columns:1fr;grid-template-rows:56px 1fr}
+  .sidebar{display:none}
+  .kpi-row{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-brand">
+    <h1>Smart Linen<br>Tracking System</h1>
+    <p>RFID Dashboard</p>
+  </div>
+  <nav class="sidebar-nav">
+    <a class="active" data-view="overview"><span class="icon">📊</span> Overview</a>
+    <a data-view="inventory"><span class="icon">🏷️</span> Inventory</a>
+    <a data-view="loss"><span class="icon">📍</span> Loss Analysis</a>
+    <a data-view="lifecycle"><span class="icon">♻️</span> Lifecycle</a>
+    <a data-view="events"><span class="icon">⚡</span> Live Events</a>
+    <a data-view="export"><span class="icon">📥</span> Export</a>
+  </nav>
+  <div class="sidebar-status">
+    <div><span class="dot"></span><span>API Connected</span></div>
+    <span class="api-url" id="api-url-display"></span>
+  </div>
+</aside>
+
+<!-- Topbar -->
+<div class="topbar">
+  <span class="topbar-title" id="page-title">Overview</span>
+  <div class="topbar-right">
+    <div class="live-badge"><span class="dot"></span>Live</div>
+    <span class="topbar-time" id="clock"></span>
+    <button class="refresh-btn" onclick="refreshData()">↻ Refresh</button>
+  </div>
+</div>
+
+<!-- Main Content -->
+<div class="main" id="main-content">
+  <div style="text-align:center;padding:40px;color:var(--dim)">Loading...</div>
+</div>
+
+</div>
+
+<script>
+// ============================================================
+// CONFIGURATION — change this to your Railway URL
+// ============================================================
+var API_BASE = 'https://web-production-51ae0.up.railway.app';
+
+document.getElementById('api-url-display').textContent = API_BASE.replace('https://','');
+
+// ============================================================
+// LIVE DATA — fetched from your real API
+// These get populated when the page loads
+// ============================================================
+var LIVE = {
+  total: 0,
+  registered: 0,
+  in_use: 0,
+  in_laundry: 0,
+  missing: 0,
+  retired: 0,
+  wash_exceeded: 0,
+  wash_critical: 0,
+  wash_warning: 0,
+  towels: [],
+  missingTowels: []
+};
+
+// ============================================================
+// DUMMY DATA — placeholder for future phases
+// Shown in red/dashed panels so you always know what's real
+// ============================================================
+var DUMMY = {
+  locations: [
+    { name: 'Floor 3', inUse: 180, missing: 14 },
+    { name: 'Floor 5', inUse: 160, missing: 11 },
+    { name: 'Pool Area', inUse: 120, missing: 7 },
+    { name: 'Gym', inUse: 100, missing: 5 },
+  ],
+  washDistribution: [
+    { range: '0–50', count: 4 },
+    { range: '51–100', count: 3 },
+    { range: '101–150', count: 2 },
+    { range: '150+', count: 1 }
+  ],
+  events: [
+    { time: '14:32:08', tag: 'TOWEL-003', event: 'DISPATCHED', location: 'Room 302' },
+    { time: '14:28:22', tag: 'TOWEL-007', event: 'RETURNED', location: 'Laundry' },
+    { time: '14:22:10', tag: 'TOWEL-001', event: 'MISSING', location: 'Floor 5' },
+  ]
+};
+
+// ============================================================
+// API FETCH FUNCTIONS
+// Each function calls one endpoint and stores the result
+// ============================================================
+
+async function fetchInventory() {
+  var res = await fetch(API_BASE + '/inventory');
+  if (!res.ok) throw new Error('Inventory fetch failed');
+  var data = await res.json();
+  LIVE.total         = data.total         || 0;
+  LIVE.registered    = data.registered    || 0;
+  LIVE.in_use        = data.in_use        || 0;
+  LIVE.in_laundry    = data.in_laundry    || 0;
+  LIVE.missing       = data.missing       || 0;
+  LIVE.retired       = data.retired       || 0;
+  LIVE.wash_exceeded = data.wash_exceeded || 0;
+  LIVE.wash_critical = data.wash_critical || 0;
+  LIVE.wash_warning  = data.wash_warning  || 0;
+}
+
+async function fetchTowels() {
+  var res = await fetch(API_BASE + '/towels');
+  if (!res.ok) throw new Error('Towels fetch failed');
+  LIVE.towels = await res.json();
+}
+
+async function fetchMissing() {
+  var res = await fetch(API_BASE + '/missing');
+  if (!res.ok) throw new Error('Missing fetch failed');
+  var data = await res.json();
+  LIVE.missingTowels = data.towels || [];
+}
+
+// Fetch all data at once, then re-render current view
+async function refreshData() {
+  try {
+    await Promise.all([fetchInventory(), fetchTowels(), fetchMissing()]);
+    navigate(currentView);
+  } catch(e) {
+    document.getElementById('main-content').innerHTML =
+      '<div class="state-error">⚠ Could not reach API at ' + API_BASE + '<br><small>' + e.message + '</small></div>';
+  }
+}
+
+// Auto-refresh every 30 seconds
+setInterval(refreshData, 30000);
+
+// ============================================================
+// HELPER — status badge HTML
+// ============================================================
+function statusTag(s) {
+  var map = {
+    'in_use':'tag-blue','registered':'tag-green',
+    'in_laundry':'tag-orange','missing':'tag-red',
+    'retired':'tag-slate',
+    'IN_USE':'tag-blue','REGISTERED':'tag-green',
+    'IN_LAUNDRY':'tag-orange','MISSING':'tag-red',
+    'RETIRED':'tag-slate'
+  };
+  return '<span class="tag ' + (map[s]||'tag-blue') + '">' + s.replace('_',' ') + '</span>';
+}
+
+// Wash cycle badge — shows remaining washes with colour coding
+function washBadge(washCount) {
+  var MAX = 200;
+  var remaining = MAX - washCount;
+  if (washCount >= MAX)  return '<span class="tag tag-red">EXCEEDED (' + washCount + '/' + MAX + ')</span>';
+  if (washCount >= 190)  return '<span class="tag tag-red">CRITICAL — ' + remaining + ' left</span>';
+  if (washCount >= 150)  return '<span class="tag tag-orange">WARNING — ' + remaining + ' left</span>';
+  return '<span style="font-family:\'DM Mono\',monospace;font-size:.7rem">' + washCount + ' <span style="color:var(--dim)">/ ' + MAX + '</span></span>';
+}
+
+function timeSince(isoStr) {
+  if (!isoStr) return '—';
+  var d = new Date(isoStr + 'Z');
+  var mins = Math.floor((Date.now() - d) / 60000);
+  if (mins < 60) return mins + 'm ago';
+  var hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h ago';
+  return Math.floor(hrs/24) + 'd ago';
+}
+
+// ============================================================
+// VIEW: OVERVIEW
+// KPIs from live API + donut chart + towel table
+// ============================================================
+function overviewView() {
+  var lossRate = LIVE.total > 0 ? ((LIVE.missing / LIVE.total) * 100).toFixed(1) : '0.0';
+
+  // Donut segments — circumference of inner circle = 100
+  var total = LIVE.total || 1;
+  var segs = [
+    { val: LIVE.in_use,    color: '#2563eb', label: 'In use',      num: LIVE.in_use },
+    { val: LIVE.in_laundry,color: '#d97706', label: 'In laundry',  num: LIVE.in_laundry },
+    { val: LIVE.registered,color: '#059669', label: 'Registered',  num: LIVE.registered },
+    { val: LIVE.missing,   color: '#dc2626', label: 'Missing',     num: LIVE.missing }
+  ];
+  var offset = 25; // start at top
+  var donutRings = segs.map(function(s) {
+    var pct = (s.val / total) * 100;
+    var ring = '<circle cx="21" cy="21" r="15.9" fill="none" stroke="' + s.color + '" stroke-width="4" stroke-dasharray="' + pct + ' ' + (100-pct) + '" stroke-dashoffset="' + offset + '" opacity=".85"/>';
+    offset -= pct;
+    return ring;
+  }).join('');
+
+  var legendHtml = segs.map(function(s) {
+    return '<div class="donut-item"><div class="donut-dot" style="background:' + s.color + '"></div>' + s.label + '<span class="donut-num">' + s.num + '</span></div>';
+  }).join('');
+
+  // Towel table (real data) — exclude retired from main view
+  var tableRows = LIVE.towels.filter(function(t){ return t.status !== 'retired'; }).length === 0
+    ? '<tr><td colspan="6" class="state-empty">No towels registered yet</td></tr>'
+    : LIVE.towels.filter(function(t){ return t.status !== 'retired'; }).map(function(t) {
+        return '<tr><td><code>' + t.tag_id + '</code></td>' +
+          '<td>' + (t.towel_type || '—') + '</td>' +
+          '<td>' + statusTag(t.status) + '</td>' +
+          '<td>' + (t.last_location || '—') + '</td>' +
+          '<td>' + washBadge(t.wash_count || 0) + '</td></tr>';
+      }).join('');
+
+  // Wash cycle alert banners
+  var washAlerts = '';
+  if (LIVE.wash_exceeded > 0) {
+    washAlerts += '<div class="wash-alert exceeded">🚨 <strong>' + LIVE.wash_exceeded + ' towel(s) exceeded 200 wash cycles</strong> — retire and replace immediately</div>';
+  }
+  if (LIVE.wash_critical > 0) {
+    washAlerts += '<div class="wash-alert critical">⚠ <strong>' + LIVE.wash_critical + ' towel(s) critical</strong> — less than 10 washes remaining before limit</div>';
+  }
+  if (LIVE.wash_warning > 0) {
+    washAlerts += '<div class="wash-alert warning">⚡ <strong>' + LIVE.wash_warning + ' towel(s) approaching limit</strong> — less than 50 washes remaining</div>';
+  }
+
+  return washAlerts +
+  '<div class="kpi-row" style="grid-template-columns:repeat(5,1fr)">' +
+    '<div class="kpi kpi-blue"><div class="kpi-label">Total Active</div><div class="kpi-value">' + LIVE.total + '</div><div class="kpi-sub">Excl. retired</div></div>' +
+    '<div class="kpi kpi-green"><div class="kpi-label">In Use</div><div class="kpi-value">' + LIVE.in_use + '</div><div class="kpi-sub">Currently dispatched</div></div>' +
+    '<div class="kpi kpi-orange"><div class="kpi-label">In Laundry</div><div class="kpi-value">' + LIVE.in_laundry + '</div><div class="kpi-sub">Being washed</div></div>' +
+    '<div class="kpi kpi-red"><div class="kpi-label">Missing</div><div class="kpi-value">' + LIVE.missing + '</div><div class="kpi-sub">' + lossRate + '% loss rate</div></div>' +
+    '<div class="kpi" style="border-top:3px solid var(--slate)"><div class="kpi-label">Retired</div><div class="kpi-value" style="color:var(--slate)">' + LIVE.retired + '</div><div class="kpi-sub">End of life</div></div>' +
+  '</div>' +
+
+  '<div class="grid-2">' +
+    '<div class="panel"><div class="panel-head"><h2>Status Breakdown</h2><span class="pill pill-live">● Live</span></div>' +
+    '<div class="donut-wrap">' +
+      '<svg class="donut-svg" viewBox="0 0 42 42">' +
+        '<circle cx="21" cy="21" r="15.9" fill="none" stroke="#f0f2f5" stroke-width="4"/>' +
+        donutRings +
+        '<text x="21" y="19" text-anchor="middle" font-size="5" fill="#111827" font-weight="600" font-family="DM Sans,sans-serif">' + LIVE.total + '</text>' +
+        '<text x="21" y="25" text-anchor="middle" font-size="3.2" fill="#6b7280" font-family="DM Sans,sans-serif">active</text>' +
+      '</svg>' +
+      '<div class="donut-legend">' + legendHtml + '</div>' +
+    '</div></div>' +
+
+    '<div class="panel"><div class="panel-head"><h2>Quick Status</h2><span class="pill pill-live">● Live</span></div>' +
+    '<div class="bar-chart">' +
+      '<div class="bar-row"><span class="bar-label">In use</span><div class="bar-track"><div class="bar-fill blue" style="width:' + ((LIVE.in_use/total)*100) + '%"></div></div><span class="bar-val">' + LIVE.in_use + '</span></div>' +
+      '<div class="bar-row"><span class="bar-label">Laundry</span><div class="bar-track"><div class="bar-fill orange" style="width:' + ((LIVE.in_laundry/total)*100) + '%"></div></div><span class="bar-val">' + LIVE.in_laundry + '</span></div>' +
+      '<div class="bar-row"><span class="bar-label">Registered</span><div class="bar-track"><div class="bar-fill green" style="width:' + ((LIVE.registered/total)*100) + '%"></div></div><span class="bar-val">' + LIVE.registered + '</span></div>' +
+      '<div class="bar-row"><span class="bar-label">Missing</span><div class="bar-track"><div class="bar-fill red" style="width:' + ((LIVE.missing/total)*100) + '%"></div></div><span class="bar-val">' + LIVE.missing + '</span></div>' +
+      '<div class="bar-row"><span class="bar-label">Retired</span><div class="bar-track"><div class="bar-fill slate" style="width:' + ((LIVE.retired/(LIVE.total+LIVE.retired||1))*100) + '%"></div></div><span class="bar-val">' + LIVE.retired + '</span></div>' +
+    '</div></div>' +
+  '</div>' +
+
+  '<div class="panel full"><div class="panel-head"><h2>All Active Towels</h2><span class="pill pill-live">' + LIVE.towels.filter(function(t){return t.status!=='retired';}).length + ' towels</span></div>' +
+  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Last Location</th><th>Wash Cycles</th></tr></thead>' +
+  '<tbody>' + tableRows + '</tbody></table></div>';
+}
+
+// ============================================================
+// VIEW: INVENTORY — full towel registry
+// ============================================================
+function inventoryView() {
+  var byStatus = { registered:0, in_use:0, in_laundry:0, missing:0 };
+  LIVE.towels.forEach(function(t){ if(byStatus[t.status] !== undefined) byStatus[t.status]++; });
+
+  var rows = LIVE.towels.length === 0
+    ? '<tr><td colspan="5" class="state-empty">No towels yet — run seed.py to add test towels</td></tr>'
+    : LIVE.towels.map(function(t) {
+        return '<tr>' +
+          '<td><code>' + t.tag_id + '</code></td>' +
+          '<td>' + (t.towel_type||'—') + '</td>' +
+          '<td>' + statusTag(t.status) + '</td>' +
+          '<td>' + (t.last_location||'—') + '</td>' +
+          '<td style="font-family:\'DM Mono\',monospace;font-size:.7rem">' + (t.wash_count||0) + '</td>' +
+        '</tr>';
+      }).join('');
+
+  return '<div class="kpi-row">' +
+    '<div class="kpi kpi-blue"><div class="kpi-label">Total</div><div class="kpi-value">' + LIVE.total + '</div></div>' +
+    '<div class="kpi kpi-green"><div class="kpi-label">Registered</div><div class="kpi-value">' + LIVE.registered + '</div></div>' +
+    '<div class="kpi kpi-blue"><div class="kpi-label">In Use</div><div class="kpi-value">' + LIVE.in_use + '</div></div>' +
+    '<div class="kpi kpi-orange"><div class="kpi-label">In Laundry</div><div class="kpi-value">' + LIVE.in_laundry + '</div></div>' +
+  '</div>' +
+
+  '<div class="panel full"><div class="panel-head"><h2>Towel Registry</h2><span class="pill pill-live">Live · ' + LIVE.towels.length + ' records</span></div>' +
+  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Last Location</th><th>Wash Count</th></tr></thead>' +
+  '<tbody>' + rows + '</tbody></table></div>';
+}
+
+// ============================================================
+// VIEW: LOSS ANALYSIS
+// Missing towels = real data | Location breakdown = dummy
+// ============================================================
+function lossView() {
+  var lossRate = LIVE.total > 0 ? ((LIVE.missing / LIVE.total) * 100).toFixed(1) : '0.0';
+
+  var missingRows = LIVE.missingTowels.length === 0
+    ? '<tr><td colspan="5" class="state-empty">✓ No missing towels right now</td></tr>'
+    : LIVE.missingTowels.map(function(t) {
+        return '<tr>' +
+          '<td><code>' + t.tag_id + '</code></td>' +
+          '<td>' + (t.towel_type||'—') + '</td>' +
+          '<td>' + (t.last_location||'—') + '</td>' +
+          '<td style="font-family:\'DM Mono\',monospace;font-size:.7rem">' + timeSince(t.dispatched_at) + '</td>' +
+          '<td><span class="tag tag-red">MISSING</span></td>' +
+        '</tr>';
+      }).join('');
+
+  var maxMiss = Math.max.apply(null, DUMMY.locations.map(function(l){return l.missing})) || 1;
+
+  return '<div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">' +
+    '<div class="kpi kpi-red"><div class="kpi-label">Total Missing</div><div class="kpi-value">' + LIVE.missing + '</div><div class="kpi-sub">Over 24 hours out</div></div>' +
+    '<div class="kpi kpi-orange"><div class="kpi-label">Loss Rate</div><div class="kpi-value">' + lossRate + '%</div><div class="kpi-sub">Of total inventory</div></div>' +
+  '</div>' +
+
+  '<div class="panel full"><div class="panel-head"><h2>Missing Towels</h2><span class="pill pill-live">● Live · ' + LIVE.missingTowels.length + ' found</span></div>' +
+  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Last Location</th><th>Time Out</th><th>Status</th></tr></thead>' +
+  '<tbody>' + missingRows + '</tbody></table></div>' +
+
+  '<div class="dummy-banner">🔴 <strong>Phase 2 data below</strong> — Location breakdown requires RFID readers per zone. Not yet connected.</div>' +
+
+  '<div class="panel dummy-panel"><div class="panel-head"><h2>Missing by Location</h2></div>' +
+  '<div class="bar-chart">' + DUMMY.locations.map(function(l) {
+    return '<div class="bar-row"><span class="bar-label">' + l.name + '</span><div class="bar-track"><div class="bar-fill dummy" style="width:' + ((l.missing/maxMiss)*100) + '%"></div></div><span class="bar-val dummy">' + l.missing + '</span></div>';
+  }).join('') + '</div></div>';
+}
+
+// ============================================================
+// VIEW: LIFECYCLE — real wash cycle data from API
+// Shows wash cycle status, warnings, and towels needing attention
+// ============================================================
+function lifecycleView() {
+  var MAX = 200;
+  var colors = ['blue','green','orange','red'];
+
+  // Count towels in each wash range using real data
+  var ranges = [
+    { label: '0–50',    min: 0,   max: 50,  count: 0, color: 'green' },
+    { label: '51–100',  min: 51,  max: 100, count: 0, color: 'blue' },
+    { label: '101–150', min: 101, max: 150, count: 0, color: 'orange' },
+    { label: '151–199', min: 151, max: 199, count: 0, color: 'red' },
+    { label: '200+',    min: 200, max: 9999,count: 0, color: 'red' },
+  ];
+  LIVE.towels.forEach(function(t) {
+    if (t.status === 'retired') return;
+    var w = t.wash_count || 0;
+    ranges.forEach(function(r) { if (w >= r.min && w <= r.max) r.count++; });
+  });
+  var maxCount = Math.max.apply(null, ranges.map(function(r){ return r.count; })) || 1;
+
+  // Towels needing attention — sorted by wash count descending
+  var attentionRows = LIVE.towels
+    .filter(function(t){ return t.status !== 'retired' && (t.wash_count || 0) >= 150; })
+    .sort(function(a,b){ return (b.wash_count||0) - (a.wash_count||0) })
+    .map(function(t) {
+      return '<tr>' +
+        '<td><code>' + t.tag_id + '</code></td>' +
+        '<td>' + (t.towel_type||'—') + '</td>' +
+        '<td>' + statusTag(t.status) + '</td>' +
+        '<td>' + washBadge(t.wash_count||0) + '</td>' +
+        '<td>' + (t.last_location||'—') + '</td>' +
+      '</tr>';
+    }).join('');
+
+  // All towels by wash count
+  var allWashRows = LIVE.towels
+    .filter(function(t){ return t.status !== 'retired'; })
+    .sort(function(a,b){ return (b.wash_count||0) - (a.wash_count||0) })
+    .map(function(t) {
+      return '<tr>' +
+        '<td><code>' + t.tag_id + '</code></td>' +
+        '<td>' + (t.towel_type||'—') + '</td>' +
+        '<td>' + statusTag(t.status) + '</td>' +
+        '<td>' + washBadge(t.wash_count||0) + '</td>' +
+      '</tr>';
+    }).join('');
+
+  // Wash alert summary
+  var washAlerts = '';
+  if (LIVE.wash_exceeded > 0) washAlerts += '<div class="wash-alert exceeded">🚨 <strong>' + LIVE.wash_exceeded + ' towel(s) exceeded 200 washes</strong> — retire immediately</div>';
+  if (LIVE.wash_critical > 0) washAlerts += '<div class="wash-alert critical">⚠ <strong>' + LIVE.wash_critical + ' towel(s) critical</strong> — less than 10 washes remaining</div>';
+  if (LIVE.wash_warning  > 0) washAlerts += '<div class="wash-alert warning">⚡ <strong>' + LIVE.wash_warning + ' towel(s) warning</strong> — less than 50 washes remaining</div>';
+  if (!washAlerts) washAlerts = '<div class="wash-alert" style="background:var(--green-bg);border:1px solid var(--green-border);color:var(--green)">✓ All towels within wash cycle limits</div>';
+
+  return washAlerts +
+
+  '<div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">' +
+    '<div class="kpi" style="border-top:3px solid var(--red)"><div class="kpi-label">Exceeded (200+)</div><div class="kpi-value" style="color:var(--red)">' + LIVE.wash_exceeded + '</div><div class="kpi-sub">Retire immediately</div></div>' +
+    '<div class="kpi" style="border-top:3px solid var(--red)"><div class="kpi-label">Critical (190–199)</div><div class="kpi-value" style="color:var(--red)">' + LIVE.wash_critical + '</div><div class="kpi-sub">Less than 10 left</div></div>' +
+    '<div class="kpi kpi-orange"><div class="kpi-label">Warning (150–189)</div><div class="kpi-value">' + LIVE.wash_warning + '</div><div class="kpi-sub">Less than 50 left</div></div>' +
+    '<div class="kpi kpi-green"><div class="kpi-label">Good (0–149)</div><div class="kpi-value">' + (LIVE.total - LIVE.wash_exceeded - LIVE.wash_critical - LIVE.wash_warning) + '</div><div class="kpi-sub">Within safe range</div></div>' +
+  '</div>' +
+
+  '<div class="grid-2">' +
+    '<div class="panel"><div class="panel-head"><h2>Wash Count Distribution</h2><span class="pill pill-live">● Live</span></div>' +
+    '<div class="bar-chart">' + ranges.map(function(r) {
+      return '<div class="bar-row"><span class="bar-label">' + r.label + '</span><div class="bar-track"><div class="bar-fill ' + r.color + '" style="width:' + ((r.count/maxCount)*100) + '%"></div></div><span class="bar-val">' + r.count + '</span></div>';
+    }).join('') + '</div></div>' +
+
+    '<div class="panel"><div class="panel-head"><h2>Wash Count — Your Towels</h2><span class="pill pill-live">● Live</span></div>' +
+    (LIVE.towels.length === 0
+      ? '<div class="state-empty">No towels registered yet</div>'
+      : '<div class="bar-chart">' + LIVE.towels.filter(function(t){return t.status!=='retired';}).slice(0,6).map(function(t,i) {
+          var pct = Math.max(((t.wash_count||0)/MAX)*100, 4);
+          var col = (t.wash_count||0) >= MAX ? 'red' : (t.wash_count||0) >= 150 ? 'orange' : colors[i%2 === 0 ? 0 : 1];
+          return '<div class="bar-row"><span class="bar-label" style="width:90px;font-size:.68rem">' + t.tag_id.slice(-8) + '</span><div class="bar-track"><div class="bar-fill ' + col + '" style="width:' + pct + '%"></div></div><span class="bar-val">' + (t.wash_count||0) + '</span></div>';
+        }).join('') + '</div>') +
+    '</div>' +
+  '</div>' +
+
+  (attentionRows
+    ? '<div class="panel full"><div class="panel-head"><h2>⚠ Towels Needing Attention</h2><span class="pill" style="background:var(--red-bg);color:var(--red);border-color:var(--red-border)">' + (LIVE.wash_exceeded + LIVE.wash_critical + LIVE.wash_warning) + ' towels</span></div>' +
+      '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Wash Cycles</th><th>Last Location</th></tr></thead>' +
+      '<tbody>' + attentionRows + '</tbody></table></div>'
+    : '') +
+
+  '<div class="panel full"><div class="panel-head"><h2>All Towels by Wash Count</h2><span class="pill pill-live">● Live</span></div>' +
+  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Wash Cycles</th></tr></thead>' +
+  '<tbody>' + (allWashRows || '<tr><td colspan="4" class="state-empty">No towels yet</td></tr>') + '</tbody></table></div>';
+}
+
+// ============================================================
+// VIEW: LIVE EVENTS — real towel list + dummy event feed
+// ============================================================
+function eventsView() {
+  var feedHtml = DUMMY.events.map(function(e) {
+    var colors = { DISPATCHED:'#2563eb', RETURNED:'#059669', MISSING:'#dc2626' };
+    return '<div class="feed-item">' +
+      '<div class="feed-dot" style="background:' + (colors[e.event]||'#6b7280') + '"></div>' +
+      '<code>' + e.tag + '</code> ' +
+      '<span style="color:var(--dark);font-weight:500">' + e.event + '</span>' +
+      ' at ' + e.location +
+      '<span class="time">' + e.time + '</span>' +
+    '</div>';
+  }).join('');
+
+  return '<div class="dummy-banner">🔴 <strong>Live event streaming is Phase 2</strong> — requires WebSocket connection to RFID readers.</div>' +
+
+  '<div class="grid-3">' +
+    '<div class="panel dummy-panel"><div class="panel-head"><h2>Event Feed</h2><span class="pill">Simulated</span></div>' +
+    '<div class="feed">' + feedHtml + '</div></div>' +
+
+    '<div class="panel"><div class="panel-head"><h2>Current Counts</h2><span class="pill pill-live">● Live</span></div>' +
+    '<div class="bar-chart">' +
+      '<div class="bar-row"><span class="bar-label">In use</span><div class="bar-track"><div class="bar-fill blue" style="width:' + ((LIVE.in_use/(LIVE.total||1))*100) + '%"></div></div><span class="bar-val">' + LIVE.in_use + '</span></div>' +
+      '<div class="bar-row"><span class="bar-label">Laundry</span><div class="bar-track"><div class="bar-fill orange" style="width:' + ((LIVE.in_laundry/(LIVE.total||1))*100) + '%"></div></div><span class="bar-val">' + LIVE.in_laundry + '</span></div>' +
+      '<div class="bar-row"><span class="bar-label">Missing</span><div class="bar-track"><div class="bar-fill red" style="width:' + ((LIVE.missing/(LIVE.total||1))*100) + '%"></div></div><span class="bar-val">' + LIVE.missing + '</span></div>' +
+    '</div></div>' +
+  '</div>';
+}
+
+// ============================================================
+// VIEW: EXPORT — live spreadsheet view with filters + download
+// Filters apply to the live table AND to the Excel download
+// activeFilters stores current filter state across tab switches
+// ============================================================
+var activeExportTab = 'summary';
+var activeFilters = { status: '', type: '', location: '', search: '' };
+
+// Called whenever a filter dropdown or search box changes
+function applyFilter() {
+  // Read current filter values from the DOM
+  activeFilters.status   = document.getElementById('f-status')   ? document.getElementById('f-status').value   : '';
+  activeFilters.type     = document.getElementById('f-type')     ? document.getElementById('f-type').value     : '';
+  activeFilters.location = document.getElementById('f-location') ? document.getElementById('f-location').value : '';
+  activeFilters.search   = document.getElementById('f-search')   ? document.getElementById('f-search').value.toLowerCase() : '';
+  navigate('export'); // re-render table with new filters applied
+}
+
+// Clears all filters back to default
+function clearFilters() {
+  activeFilters = { status: '', type: '', location: '', search: '' };
+  navigate('export');
+}
+
+// Filter the towels array using activeFilters
+// Returns only towels that match ALL active filters
+function getFilteredTowels() {
+  return LIVE.towels.filter(function(t) {
+    if (activeFilters.status   && t.status      !== activeFilters.status)                          return false;
+    if (activeFilters.type     && t.towel_type  !== activeFilters.type)                            return false;
+    if (activeFilters.location && (t.last_location||'') !== activeFilters.location)               return false;
+    if (activeFilters.search   && !t.tag_id.toLowerCase().includes(activeFilters.search))          return false;
+    return true;
+  });
+}
+
+// Build the filter bar HTML — dropdowns populated from real data
+function buildFilterBar() {
+  // Get unique types and locations from live data for dropdown options
+  var types     = [...new Set(LIVE.towels.map(function(t){ return t.towel_type; }).filter(Boolean))];
+  var locations = [...new Set(LIVE.towels.map(function(t){ return t.last_location; }).filter(Boolean))];
+  var filtered  = getFilteredTowels();
+  var isFiltered = activeFilters.status || activeFilters.type || activeFilters.location || activeFilters.search;
+
+  return '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 18px;background:var(--bg);border-bottom:1px solid var(--border)">' +
+
+    // Search by tag ID
+    '<input id="f-search" type="text" placeholder="🔍 Search tag ID..." value="' + (activeFilters.search||'') + '" ' +
+      'oninput="applyFilter()" ' +
+      'style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.75rem;' +
+      'background:var(--surface);color:var(--dark);outline:none;width:160px;font-family:\'DM Mono\',monospace"/>' +
+
+    // Status filter
+    '<select id="f-status" onchange="applyFilter()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.75rem;background:var(--surface);color:var(--dark);outline:none;cursor:pointer">' +
+      '<option value="">All Statuses</option>' +
+      '<option value="registered"'  + (activeFilters.status==='registered' ?' selected':'') + '>Registered</option>' +
+      '<option value="in_use"'      + (activeFilters.status==='in_use'     ?' selected':'') + '>In Use</option>' +
+      '<option value="in_laundry"'  + (activeFilters.status==='in_laundry' ?' selected':'') + '>In Laundry</option>' +
+      '<option value="missing"'     + (activeFilters.status==='missing'    ?' selected':'') + '>Missing</option>' +
+    '</select>' +
+
+    // Type filter — populated from real towel types in database
+    '<select id="f-type" onchange="applyFilter()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.75rem;background:var(--surface);color:var(--dark);outline:none;cursor:pointer">' +
+      '<option value="">All Types</option>' +
+      types.map(function(t){ return '<option value="' + t + '"' + (activeFilters.type===t?' selected':'') + '>' + t.charAt(0).toUpperCase()+t.slice(1) + '</option>'; }).join('') +
+    '</select>' +
+
+    // Location filter — populated from real locations in database
+    '<select id="f-location" onchange="applyFilter()" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.75rem;background:var(--surface);color:var(--dark);outline:none;cursor:pointer">' +
+      '<option value="">All Locations</option>' +
+      locations.map(function(l){ return '<option value="' + l + '"' + (activeFilters.location===l?' selected':'') + '>' + l + '</option>'; }).join('') +
+    '</select>' +
+
+    // Clear button — only shows when a filter is active
+    (isFiltered ? '<button onclick="clearFilters()" style="padding:6px 10px;border:1px solid var(--red-border);border-radius:6px;font-size:.72rem;background:var(--red-bg);color:var(--red);cursor:pointer;font-family:\'DM Sans\',sans-serif">✕ Clear</button>' : '') +
+
+    // Result count — shows how many rows match current filters
+    '<span style="margin-left:auto;font-size:.72rem;color:var(--dim)">' +
+      (isFiltered ? '<strong style="color:var(--blue)">' + filtered.length + '</strong> of ' + LIVE.towels.length : LIVE.towels.length) +
+    ' towels</span>' +
+  '</div>';
+}
+
+function exportView() {
+  var total      = LIVE.total || 1;
+  var lossRate   = LIVE.total > 0 ? ((LIVE.missing / LIVE.total) * 100).toFixed(1) : '0.0';
+  var generatedAt = new Date().toLocaleString();
+  var filtered   = getFilteredTowels(); // Apply filters to towel list
+  var isFiltered = activeFilters.status || activeFilters.type || activeFilters.location || activeFilters.search;
+
+  // ---- Sheet 1: Summary — always shows full counts, filters don't apply here ----
+  var summaryRows = [
+    ['Total Towels',  LIVE.total,      '100%',                                          'All towels in system'],
+    ['Registered',    LIVE.registered, ((LIVE.registered/total)*100).toFixed(1) + '%',  'In inventory, not dispatched'],
+    ['In Use',        LIVE.in_use,     ((LIVE.in_use/total)*100).toFixed(1) + '%',       'Currently out in rooms'],
+    ['In Laundry',    LIVE.in_laundry, ((LIVE.in_laundry/total)*100).toFixed(1) + '%',  'Returned, being washed'],
+    ['Missing',       LIVE.missing,    ((LIVE.missing/total)*100).toFixed(1) + '%',      'Over 24hrs out — investigate'],
+    ['Loss Rate',     lossRate + '%',  '—',                                              'Missing ÷ Total'],
+  ];
+  var rowColors = ['var(--blue-bg)','var(--green-bg)','var(--blue-bg)','var(--orange-bg)','var(--red-bg)','var(--red-bg)'];
+  var summaryHtml =
+    '<div style="padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border);font-size:.72rem;color:var(--dim)">Summary always shows full counts — filters apply to All Towels tab</div>' +
+    '<table class="tbl"><thead><tr><th>Metric</th><th>Count</th><th>% of Total</th><th>Notes</th></tr></thead><tbody>' +
+    summaryRows.map(function(r,i){
+      return '<tr style="background:' + rowColors[i] + '">' + r.map(function(c){ return '<td>' + c + '</td>'; }).join('') + '</tr>';
+    }).join('') + '</tbody></table>';
+
+  // ---- Sheet 2: All Towels — filtered ----
+  var statusBg = { in_use:'var(--blue-bg)', in_laundry:'var(--orange-bg)', registered:'var(--green-bg)', missing:'var(--red-bg)' };
+  var towelsHtml = filtered.length === 0
+    ? '<tr><td colspan="6" class="state-empty">No towels match the current filters</td></tr>'
+    : filtered.map(function(t){
+        return '<tr style="background:' + (statusBg[t.status]||'') + '">' +
+          '<td><code>' + t.tag_id + '</code></td>' +
+          '<td>' + (t.towel_type||'—') + '</td>' +
+          '<td>' + statusTag(t.status) + '</td>' +
+          '<td>' + (t.last_location||'—') + '</td>' +
+          '<td style="font-family:\'DM Mono\',monospace">' + (t.wash_count||0) + '</td>' +
+          '<td style="font-size:.68rem;color:var(--dim)">' + (t.created_at ? t.created_at.slice(0,10) : '—') + '</td>' +
+        '</tr>';
+      }).join('');
+  var allTowelsHtml =
+    buildFilterBar() +
+    '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Last Location</th><th>Wash Count</th><th>Registered</th></tr></thead><tbody>' +
+    towelsHtml + '</tbody></table>';
+
+  // ---- Sheet 3: Missing — always shows all missing, no filter needed ----
+  var missingHtml = LIVE.missingTowels.length === 0
+    ? '<tr><td colspan="5" style="text-align:center;padding:24px;background:var(--green-bg);color:var(--green);font-weight:600">✓ No missing towels at this time</td></tr>'
+    : LIVE.missingTowels.map(function(t){
+        return '<tr style="background:var(--red-bg)">' +
+          '<td><code>' + t.tag_id + '</code></td>' +
+          '<td>' + (t.towel_type||'—') + '</td>' +
+          '<td>' + (t.last_location||'—') + '</td>' +
+          '<td>' + timeSince(t.dispatched_at) + '</td>' +
+          '<td style="color:var(--red);font-weight:600">Investigate immediately</td>' +
+        '</tr>';
+      }).join('');
+  var missingSheetHtml =
+    '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Last Location</th><th>Time Out</th><th>Action</th></tr></thead><tbody>' +
+    missingHtml + '</tbody></table>';
+
+  // ---- Sheet 4: Events ----
+  var eventColors = { DISPATCHED:'var(--blue-bg)', RETURNED:'var(--green-bg)', MISSING:'var(--red-bg)', REGISTERED:'var(--slate-bg)' };
+  var eventsHtml = LIVE.towels.length === 0
+    ? '<tr><td colspan="4" class="state-empty">No events yet</td></tr>'
+    : LIVE.towels.map(function(t, i){
+        var bg = eventColors[t.status === 'in_use' ? 'DISPATCHED' : t.status === 'in_laundry' ? 'RETURNED' : 'REGISTERED'] || '';
+        return '<tr style="background:' + bg + '">' +
+          '<td style="color:var(--dim);font-family:\'DM Mono\',monospace">' + (i+1) + '</td>' +
+          '<td><code>' + t.tag_id + '</code></td>' +
+          '<td>' + (t.status === 'in_use' ? 'DISPATCHED' : t.status === 'in_laundry' ? 'RETURNED' : t.status.toUpperCase()) + '</td>' +
+          '<td>' + (t.last_location||'—') + '</td>' +
+        '</tr>';
+      }).join('');
+  var eventsSheetHtml =
+    '<table class="tbl"><thead><tr><th>#</th><th>Tag ID</th><th>Last Event</th><th>Location</th></tr></thead><tbody>' +
+    eventsHtml + '</tbody></table>';
+
+  // Build download URL — appends filter params so Railway exports only filtered data
+  var downloadUrl = API_BASE + '/export';
+  var params = [];
+  if (activeFilters.status)   params.push('status='   + encodeURIComponent(activeFilters.status));
+  if (activeFilters.type)     params.push('type='     + encodeURIComponent(activeFilters.type));
+  if (activeFilters.location) params.push('location=' + encodeURIComponent(activeFilters.location));
+  if (activeFilters.search)   params.push('search='   + encodeURIComponent(activeFilters.search));
+  if (params.length) downloadUrl += '?' + params.join('&');
+
+  // ---- Build the full view ----
+  return '<div class="export-toolbar">' +
+    '<div><strong style="font-size:.85rem;color:var(--dark)">Live Export View</strong>' +
+    '<p>Data refreshed at ' + generatedAt + (isFiltered ? ' · <strong style="color:var(--blue)">Filters active — download will match view</strong>' : ' · No filters — showing all data') + '</p></div>' +
+    '<a class="btn-download" href="' + downloadUrl + '" target="_blank">⬇ Download Excel</a>' +
+  '</div>' +
+
+  '<div class="export-tabs">' +
+    '<button class="export-tab' + (activeExportTab==='summary'?' active':'') + '" onclick="switchExportTab(\'summary\')">📊 Summary</button>' +
+    '<button class="export-tab' + (activeExportTab==='towels'?' active':'') + '" onclick="switchExportTab(\'towels\')">🏷️ All Towels</button>' +
+    '<button class="export-tab' + (activeExportTab==='missing'?' active':'') + '" onclick="switchExportTab(\'missing\')">🚨 Missing</button>' +
+    '<button class="export-tab' + (activeExportTab==='events'?' active':'') + '" onclick="switchExportTab(\'events\')">📋 Events</button>' +
+  '</div>' +
+
+  '<div class="panel full" style="padding:0;overflow:hidden">' +
+    '<div class="export-sheet' + (activeExportTab==='summary'?' active':'') + '" id="sheet-summary"><div class="sheet-table-wrap">' + summaryHtml + '</div></div>' +
+    '<div class="export-sheet' + (activeExportTab==='towels'?' active':'') + '" id="sheet-towels"><div class="sheet-table-wrap">' + allTowelsHtml + '</div></div>' +
+    '<div class="export-sheet' + (activeExportTab==='missing'?' active':'') + '" id="sheet-missing"><div class="sheet-table-wrap">' + missingSheetHtml + '</div></div>' +
+    '<div class="export-sheet' + (activeExportTab==='events'?' active':'') + '" id="sheet-events"><div class="sheet-table-wrap">' + eventsSheetHtml + '</div></div>' +
+  '</div>';
+}
+
+// Switches between the 4 sheet tabs without re-fetching data
+function switchExportTab(tab) {
+  activeExportTab = tab;
+  navigate('export');
+}
+
+// ============================================================
+// ROUTER — handles sidebar navigation
+// ============================================================
+var views = {
+  overview:  { title: 'Overview',       render: overviewView },
+  inventory: { title: 'Inventory',      render: inventoryView },
+  loss:      { title: 'Loss Analysis',  render: lossView },
+  lifecycle: { title: 'Lifecycle',      render: lifecycleView },
+  events:    { title: 'Live Events',    render: eventsView },
+  export:    { title: 'Export',         render: exportView }
+};
+
+var currentView = 'overview';
+var mainEl   = document.getElementById('main-content');
+var titleEl  = document.getElementById('page-title');
+var navLinks = document.querySelectorAll('.sidebar-nav a');
+
+function navigate(view) {
+  currentView = view;
+  var v = views[view] || views.overview;
+  titleEl.textContent = v.title;
+  mainEl.innerHTML = v.render();
+  navLinks.forEach(function(a) {
+    a.classList.toggle('active', a.getAttribute('data-view') === view);
+  });
+}
+
+navLinks.forEach(function(a) {
+  a.addEventListener('click', function() { navigate(this.getAttribute('data-view')); });
+});
+
+// ============================================================
+// CLOCK
+// ============================================================
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ============================================================
+// INIT — fetch real data then render
+// ============================================================
+refreshData();
+</script>
+</body>
+</html>
