@@ -737,3 +737,20 @@ setInterval(fetchInventory, 30000); // Refresh every 30 seconds
 </script>
 </body>
 </html>
+
+#----------------------------------------------------------------------------------------------------------------------
+
+cat >> main.py << 'EOF'
+
+# TEMPORARY — debug file paths
+@app.get("/debug-paths")
+def debug_paths():
+    import os
+    return {
+        "cwd": os.getcwd(),
+        "files_in_cwd": os.listdir(os.getcwd()),
+        "abspath": os.path.abspath(__file__)
+    }
+EOF
+
+#----------------------------------------------------------------------------------------------------------------------------
