@@ -871,9 +871,12 @@ def export_excel(
 @app.get("/dashboard")
 def dashboard_page(username: str = Depends(verify_staff)):
     from fastapi.responses import HTMLResponse
-    with open("dashboard.html", "r") as f:
+    import os
+    # Get the directory where main.py lives and look for dashboard.html there
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    file_path = os.path.join(base_dir, "dashboard.html")
+    with open(file_path, "r") as f:
         return HTMLResponse(content=f.read())
-
 #-------------------------------------------------------------------------------------------------------------------------------------------------
 
 
