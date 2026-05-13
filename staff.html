@@ -770,9 +770,11 @@ function closeConfirm() {
   document.getElementById('confirm-overlay').style.display = 'none';
   confirmCallback = null;
 }
-document.getElementById('confirm-yes-btn').addEventListener('click', function() {
-  closeConfirm();
-  if (confirmCallback) confirmCallback();
+document.addEventListener("DOMContentLoaded", function() {
+  document.getElementById("confirm-yes-btn").addEventListener("click", function() {
+    closeConfirm();
+    if (confirmCallback) confirmCallback();
+  });
 });
 
 // ============================================================
