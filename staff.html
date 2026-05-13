@@ -440,7 +440,7 @@ main{
     <p id="confirm-msg">This action cannot be undone.</p>
     <p class="confirm-tag" id="confirm-tag"></p>
     <div class="confirm-btns" style="margin-top:16px">
-      <button class="confirm-yes" id="confirm-yes-btn" onclick="if(confirmCallback){closeConfirm();confirmCallback();}">Yes, proceed</button>
+      <button class="confirm-yes" id="confirm-yes-btn" onclick="executeConfirm()">Yes, proceed</button>
       <button class="confirm-no" onclick="closeConfirm()">Cancel</button>
     </div>
   </div>
@@ -767,6 +767,7 @@ function showConfirm(title, msg, tag, yesLabel, callback) {
   confirmCallback = callback;
 }
 function closeConfirm() {
+function executeConfirm() { if (confirmCallback) { var cb = confirmCallback; closeConfirm(); cb(); } }
   document.getElementById('confirm-overlay').style.display = 'none';
   confirmCallback = null;
 }
