@@ -440,7 +440,7 @@ main{
     <p id="confirm-msg">This action cannot be undone.</p>
     <p class="confirm-tag" id="confirm-tag"></p>
     <div class="confirm-btns" style="margin-top:16px">
-      <button class="confirm-yes" id="confirm-yes-btn" onclick="executeConfirm()">Yes, proceed</button>
+      <button class="confirm-yes" id="confirm-yes-btn">Yes, proceed</button>
       <button class="confirm-no" onclick="closeConfirm()">Cancel</button>
     </div>
   </div>
@@ -901,6 +901,7 @@ updateClock();
 // ============================================================
 fetchInventory();
 setInterval(fetchInventory, 30000); // Refresh every 30 seconds
+document.getElementById("confirm-yes-btn").addEventListener("click", executeConfirm);
 </script>
 </body>
 </html>
