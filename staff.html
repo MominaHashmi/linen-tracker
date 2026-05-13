@@ -756,7 +756,7 @@ async function doLookup() {
 // CONFIRM DIALOG
 // Shows a popup before retire or delete to prevent accidents
 // ============================================================
-var confirmCallback = null;
+window.confirmCallback = null;
 
 function showConfirm(title, msg, tag, yesLabel, callback) {
   document.getElementById('confirm-title').textContent    = title;
@@ -764,12 +764,12 @@ function showConfirm(title, msg, tag, yesLabel, callback) {
   document.getElementById('confirm-tag').textContent      = tag;
   document.getElementById('confirm-yes-btn').textContent  = yesLabel;
   document.getElementById('confirm-overlay').style.display = 'flex';
-  confirmCallback = callback;
+  window.confirmCallback = callback;
 }
 function closeConfirm() {
-function executeConfirm() { if (confirmCallback) { var cb = confirmCallback; closeConfirm(); cb(); } }
+function executeConfirm() { if (window.confirmCallback) { var cb = window.confirmCallback; closeConfirm(); cb(); } }
   document.getElementById('confirm-overlay').style.display = 'none';
-  confirmCallback = null;
+  window.confirmCallback = null;
 }
 
 // ============================================================
