@@ -440,7 +440,7 @@ main{
     <p id="confirm-msg">This action cannot be undone.</p>
     <p class="confirm-tag" id="confirm-tag"></p>
     <div class="confirm-btns" style="margin-top:16px">
-      <button class="confirm-yes" id="confirm-yes-btn">Yes, proceed</button>
+      <button class="confirm-yes" id="confirm-yes-btn" onclick="if(confirmCallback){closeConfirm();confirmCallback();}">Yes, proceed</button>
       <button class="confirm-no" onclick="closeConfirm()">Cancel</button>
     </div>
   </div>
@@ -770,12 +770,6 @@ function closeConfirm() {
   document.getElementById('confirm-overlay').style.display = 'none';
   confirmCallback = null;
 }
-document.addEventListener("DOMContentLoaded", function() {
-  document.getElementById("confirm-yes-btn").addEventListener("click", function() {
-    closeConfirm();
-    if (confirmCallback) confirmCallback();
-  });
-});
 
 // ============================================================
 // CLEAN ACTION
