@@ -195,7 +195,7 @@ main{
 /* Confirmation dialog overlay */
 .confirm-overlay{
   position:fixed;inset:0;background:rgba(0,0,0,.7);
-  align-items:center;justify-content:center;
+  display:flex;align-items:center;justify-content:center;
   z-index:1000;animation:fadeIn .2s ease;
 }
 .confirm-box{
@@ -432,19 +432,6 @@ main{
         🗑 Delete Defective Tag — permanent, cannot undo
       </button>
     </div>
-
-<!-- Confirmation dialog — shown before retire or delete -->
-<div class="confirm-overlay" id="confirm-overlay" style="display:none">
-  <div class="confirm-box">
-    <h3 id="confirm-title">Are you sure?</h3>
-    <p id="confirm-msg">This action cannot be undone.</p>
-    <p class="confirm-tag" id="confirm-tag"></p>
-    <div class="confirm-btns" style="margin-top:16px">
-      <button class="confirm-yes" id="confirm-yes-btn">Yes, proceed</button>
-      <button class="confirm-no" onclick="closeConfirm()">Cancel</button>
-    </div>
-  </div>
-</div>
 
     <!-- Register New Towel Card -->
     <!-- Only needs Tag ID + Towel Type. No location — new towels go to inventory, not a room -->
@@ -752,105 +739,61 @@ async function doLookup() {
   }
 }
 
-// ============================================================
-// CONFIRM DIALOG
-// Shows a popup before retire or delete to prevent accidents
-// ============================================================
-window.confirmCallback = null;
-
-function showConfirm(title, msg, tag, yesLabel, callback) {
-  document.getElementById('confirm-title').textContent    = title;
-  document.getElementById('confirm-msg').textContent      = msg;
-  document.getElementById('confirm-tag').textContent      = tag;
-  document.getElementById('confirm-yes-btn').textContent  = yesLabel;
-  document.getElementById('confirm-overlay').style.display = 'flex';
-  window.confirmCallback = callback;
-}
-function closeConfirm() {
-function executeConfirm() { if (window.confirmCallback) { var cb = window.confirmCallback; closeConfirm(); cb(); } }
-  document.getElementById('confirm-overlay').style.display = 'none';
-  window.confirmCallback = null;
-}
 
 // ============================================================
 // CLEAN ACTION
-// Marks towel as clean after laundry — moves back to registered
 // ============================================================
 async function doClean() {
   var tag = getTag();
-  if (!tag) { showFeedback('error', 'No tag entered', 'Scan or type a Tag ID first'); return; }
+  if (!tag) { showFeedback("error", "No tag entered", "Scan or type a Tag ID first"); return; }
   try {
-    var res = await fetch(API_BASE + '/towels/' + tag + '/clean', { method: 'PATCH', headers: authHeaders() });
+    var res = await fetch(API_BASE + "/towels/" + tag + "/clean", { method: "PATCH", headers: authHeaders() });
     var data = await res.json();
     if (res.ok) {
-      showFeedback('success', 'Marked as clean', 'Towel is ready to dispatch again · Wash #' + data.wash_count, tag);
-      addLog('CLEANED', tag + ' → Ready', 'var(--orange)');
-      clearInput();
-      fetchInventory();
-    } else {
-      showFeedback('error', 'Cannot clean', data.detail, tag);
-    }
-  } catch(e) {
-    showFeedback('error', 'Cannot reach server', 'Check your internet connection');
-  }
+      showFeedback("success", "Marked as clean", "Ready to dispatch · Wash #" + data.wash_count, tag);
+      addLog("CLEANED", tag + " → Ready", "var(--orange)");
+      clearInput(); fetchInventory();
+    } else { showFeedback("error", "Cannot clean", data.detail, tag); }
+  } catch(e) { showFeedback("error", "Cannot reach server", "Check your internet connection"); }
 }
 
 // ============================================================
 // RETIRE ACTION
-// Soft end-of-life — stays in database for history
-// Use when towel reaches 200 wash cycles or is damaged
 // ============================================================
 async function doRetire() {
   var tag = getTag();
-  if (!tag) { showFeedback('error', 'No tag entered', 'Scan or type a Tag ID first'); return; }
-  showConfirm(
-    'Retire this towel?',
-    'Marks towel as end-of-life. Removed from active inventory but kept in history.',
-    tag, 'Yes, Retire Towel',
-    async function() {
-      try {
-        var res = await fetch(API_BASE + '/towels/' + tag + '/retire', { method: 'PATCH', headers: authHeaders() });
-        var data = await res.json();
-        if (res.ok) {
-          showFeedback('success', 'Towel retired', 'Removed from active inventory · Total washes: ' + data.total_washes, tag);
-          addLog('RETIRED', tag + ' · ' + data.total_washes + ' washes', 'var(--orange)');
-          clearInput(); fetchInventory();
-        } else {
-          showFeedback('error', 'Cannot retire', data.detail, tag);
-        }
-      } catch(e) { showFeedback('error', 'Cannot reach server', 'Check your internet connection'); }
-    }
-  );
+  if (!tag) { showFeedback("error", "No tag entered", "Scan or type a Tag ID first"); return; }
+  if (!window.confirm("Retire towel " + tag + "?\n\nMarks as end-of-life. Removed from active inventory but kept in history.")) return;
+  try {
+    var res = await fetch(API_BASE + "/towels/" + tag + "/retire", { method: "PATCH", headers: authHeaders() });
+    var data = await res.json();
+    if (res.ok) {
+      showFeedback("success", "Towel retired", "Total washes: " + data.total_washes, tag);
+      addLog("RETIRED", tag + " · " + data.total_washes + " washes", "var(--orange)");
+      clearInput(); fetchInventory();
+    } else { showFeedback("error", "Cannot retire", data.detail, tag); }
+  } catch(e) { showFeedback("error", "Cannot reach server", "Check your internet connection"); }
 }
 
 // ============================================================
 // DELETE ACTION
-// Permanently removes defective tag — cannot be undone
-// Type Tag ID manually — broken chips cannot be scanned
 // ============================================================
 async function doDelete() {
   var tag = getTag();
-  if (!tag) { showFeedback('error', 'No tag entered', 'Type the Tag ID manually for defective tags'); return; }
-  showConfirm(
-    'Permanently delete this tag?',
-    '⚠ Cannot be undone. All history erased. Only use for broken RFID chips that cannot be scanned.',
-    tag, 'Yes, Delete Permanently',
-    async function() {
-      try {
-        var res = await fetch(API_BASE + '/towels/' + tag, { method: 'DELETE', headers: authHeaders() });
-        var data = await res.json();
-        if (res.ok) {
-          showFeedback('success', 'Tag deleted permanently', 'All records removed from system', tag);
-          addLog('DELETED', tag + ' — permanent', 'var(--red)');
-          clearInput(); fetchInventory();
-        } else if (res.status === 404) {
-          showFeedback('error', 'Tag not found', 'This Tag ID does not exist', tag);
-        } else {
-          showFeedback('error', 'Cannot delete', data.detail, tag);
-        }
-      } catch(e) { showFeedback('error', 'Cannot reach server', 'Check your internet connection'); }
-    }
-  );
+  if (!tag) { showFeedback("error", "No tag entered", "Type the Tag ID manually for defective tags"); return; }
+  if (!window.confirm("DELETE " + tag + " permanently?\n\nCannot be undone. Only use for broken RFID chips.")) return;
+  if (!window.confirm("Are you absolutely sure?\n\nAll history for " + tag + " will be permanently erased.")) return;
+  try {
+    var res = await fetch(API_BASE + "/towels/" + tag, { method: "DELETE", headers: authHeaders() });
+    var data = await res.json();
+    if (res.ok) {
+      showFeedback("success", "Tag deleted permanently", "All records removed", tag);
+      addLog("DELETED", tag + " — permanent", "var(--red)");
+      clearInput(); fetchInventory();
+    } else if (res.status === 404) {
+      showFeedback("error", "Tag not found", "This Tag ID does not exist", tag);
+    } else { showFeedback("error", "Cannot delete", data.detail, tag); }
+  } catch(e) { showFeedback("error", "Cannot reach server", "Check your internet connection"); }
 }
 
 // ============================================================
@@ -901,7 +844,6 @@ updateClock();
 // ============================================================
 fetchInventory();
 setInterval(fetchInventory, 30000); // Refresh every 30 seconds
-document.getElementById("confirm-yes-btn").addEventListener("click", executeConfirm);
 </script>
 </body>
 </html>
