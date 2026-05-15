@@ -44,6 +44,17 @@ class Event(Base):
     location = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
 
+class DeletedTag(Base):
+    __tablename__ = "deleted_tags"
+
+    id           = Column(Integer, primary_key=True, autoincrement=True)
+    tag_id       = Column(String)                    # Original RFID tag ID
+    towel_type   = Column(String, nullable=True)     # bath, hand, pool, face
+    total_washes = Column(Integer, default=0)        # Wash count at time of deletion
+    last_location= Column(String, nullable=True)     # Where it was last seen
+    reason       = Column(String, nullable=True)     # Why it was deleted
+    deleted_at   = Column(DateTime, default=datetime.datetime.utcnow)
+
 def init_db():
     Base.metadata.create_all(bind=engine)
 
