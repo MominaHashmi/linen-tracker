@@ -119,12 +119,6 @@ app.add_middleware(
     allow_methods=["*"],     # Allow GET, POST, PATCH and all other methods
     allow_headers=["*"],     # Allow all headers
 )
-@app.on_event("startup")
-def startup():
-    try:
-        init_db()
-    except Exception as e:
-        print("DB INIT ERROR:", e)
 
 
 # ============================================================
