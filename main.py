@@ -29,6 +29,7 @@ import io
 import smtplib  # Python's built-in email sending library — no pip install needed
 from email.mime.text import MIMEText  # formats the email body as HTML
 from email.mime.multipart import MIMEMultipart  # allows email to have subject + body
+from database import init_db
 
 # ============================================================
 # HTTP BASIC AUTH — Staff login
@@ -120,7 +121,10 @@ app.add_middleware(
 )
 @app.on_event("startup")
 def startup():
-    init_db()
+    try:
+        init_db()
+    except Exception as e:
+        print("DB INIT ERROR:", e)
 
 
 # ============================================================
