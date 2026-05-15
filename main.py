@@ -295,6 +295,36 @@ async def daily_report():
 
 #----------------------------------------------------------------------------------------------------------------------------------------------------------
 
+# Get tags deleted in the last 24 hours for email report
+from datetime import timedelta
+recent_deleted = db.query(DeletedTag).filter(
+    DeletedTag.deleted_at >= datetime.datetime.utcnow() - timedelta(hours=24)
+).all()
+
+if recent_deleted:
+    deleted_rows = "".join([
+        f"<tr><td style='padding:8px;border-bottom:1px solid #fee2e2;font-family:monospace'>{d.tag_id}</td>"
+        f"<td style='padding:8px;border-bottom:1px solid #fee2e2'>{d.towel_type or '—'}</td>"
+        f"<td style='padding:8px;border-bottom:1px solid #fee2e2'>{d.total_washes}</td>"
+        f"<td style='padding:8px;border-bottom:1px solid #fee2e2'>{d.reason or '—'}</td></tr>"
+        for d in recent_deleted
+    ])
+    deleted_section = f"""
+        <h3 style='color:#991b1b;margin-top:24px'>Tags Deleted Today ({len(recent_deleted)})</h3>
+        <table style='width:100%;border-collapse:collapse;background:#fef2f2;border-radius:8px'>
+            <tr style='background:#991b1b;color:white'>
+                <th style='padding:8px;text-align:left'>Tag ID</th>
+                <th style='padding:8px;text-align:left'>Type</th>
+                <th style='padding:8px;text-align:left'>Washes</th>
+                <th style='padding:8px;text-align:left'>Reason</th>
+            </tr>
+            {deleted_rows}
+        </table>
+    """
+else:
+    deleted_section = ""
+
+#----------------------------------------------------------------------------------------------------------------------------------------------------------
 # ============================================================
 # DATA MODEL — what a "register towel" request must include
 # Pydantic checks this automatically before your function runs
