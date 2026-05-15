@@ -939,7 +939,7 @@ function switchExportTab(tab) {
 // VIEW: DELETED TAGS — audit trail of all deleted tags
 // ============================================================
 async function deletedView() {
-  var res = await fetch(API_BASE + '/deleted', { headers: { 'X-API-Key': API_KEY } });
+  var res = await fetch(API_BASE + '/deleted', { headers: { 'hotel-linen-2026-xK9mP': API_KEY } });
   var data = await res.json();
   var tags = data.tags || [];
 
