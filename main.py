@@ -259,7 +259,7 @@ def send_email(subject: str, html_body: str):
                 f"<td style='padding:8px;border-bottom:1px solid #fee2e2'>{d.reason or '—'}</td></tr>"
                 for d in recent_deleted
             ])
-            deleted_section = f"""..."""
+            deleted_section = f"<h3>Deleted Today</h3><table>{deleted_rows}</table>"
         else:
             deleted_section = ""
 
