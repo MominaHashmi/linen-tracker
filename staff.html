@@ -784,7 +784,10 @@ async function doDelete() {
   if (!window.confirm("DELETE " + tag + " permanently?\n\nCannot be undone. Only use for broken RFID chips.")) return;
   if (!window.confirm("Are you absolutely sure?\n\nAll history for " + tag + " will be permanently erased.")) return;
   try {
-    var res = await fetch(API_BASE + "/towels/" + tag, { method: "DELETE", headers: authHeaders() });
+    var res = await fetch(API_BASE + '/towels/' + tag + '?reason=Defective%20RFID%20tag', {
+      method: 'DELETE',
+      headers: authHeaders()
+    });
     var data = await res.json();
     if (res.ok) {
       showFeedback("success", "Tag deleted permanently", "All records removed", tag);
