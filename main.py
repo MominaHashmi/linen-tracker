@@ -6,7 +6,7 @@
 
 from fastapi import FastAPI, HTTPException
 from sqlalchemy.orm import Session
-from database import SessionLocal, Towel, Event, init_db
+from database import SessionLocal, Towel, Event, DeletedTag, init_db
 from pydantic import BaseModel
 from typing import Optional
 import datetime
@@ -589,6 +589,32 @@ def delete_towel(tag_id: str, reason: Optional[str] = None, _=Depends(verify_key
 
 #---------------------------------------------------------------------------------------------------------------------------------
 
+# --- Get deleted tags history ---
+# GET /deleted
+# Returns full audit trail of all deleted tags
+# Protected — requires API key
+@app.get("/deleted")
+def get_deleted_tags(_=Depends(verify_key)):
+    db = SessionLocal()
+    try:
+        deleted = db.query(DeletedTag).order_by(DeletedTag.deleted_at.desc()).all()
+        return {
+            "total_deleted": len(deleted),
+            "tags": [
+                {
+                    "tag_id":       d.tag_id,
+                    "towel_type":   d.towel_type,
+                    "total_washes": d.total_washes,
+                    "last_location":d.last_location,
+                    "reason":       d.reason,
+                    "deleted_at":   str(d.deleted_at)
+                } for d in deleted
+            ]
+        }
+    finally:
+        db.close()
+
+#-----------------------------------------------------------------------------------------------------------------------------------
 
 # --- Get currently missing towels ---
 # GET /missing
