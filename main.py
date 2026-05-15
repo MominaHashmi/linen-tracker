@@ -666,7 +666,6 @@ def export_excel(
     type:     Optional[str] = None,   # Filter by towel type e.g. "bath"
     location: Optional[str] = None,   # Filter by last location e.g. "Floor 3"
     search:   Optional[str] = None,   # Search by tag ID e.g. "TOWEL-00"
-    _=Depends(verify_key)
 ):
     db = SessionLocal()
     try:
