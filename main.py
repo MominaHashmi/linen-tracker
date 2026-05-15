@@ -546,7 +546,7 @@ def retire_towel(tag_id: str, reason: Optional[str] = None, _=Depends(verify_key
 # Cannot be undone — use retire for normal end of life
 # Protected — requires API key
 @app.delete("/towels/{tag_id}")
-def delete_towel(tag_id: str, _=Depends(verify_key)):
+def delete_towel(tag_id: str, reason: Optional[str] = None, _=Depends(verify_key)):
     db = SessionLocal()
     try:
         towel = db.query(Towel).filter(Towel.tag_id == tag_id).first()
@@ -560,6 +560,17 @@ def delete_towel(tag_id: str, _=Depends(verify_key)):
                 detail="Towel is currently dispatched — return it first before deleting"
             )
 
+        # Log to deleted_tags BEFORE erasing — permanent audit trail
+        deleted_log = DeletedTag(
+            tag_id        = towel.tag_id,
+            towel_type    = towel.towel_type,
+            total_washes  = towel.wash_count or 0,
+            last_location = towel.last_location,
+            reason        = reason or "Defective RFID tag",
+            deleted_at    = datetime.datetime.utcnow()
+        )
+        db.add(deleted_log)
+
         # Delete all events for this towel first (foreign key cleanup)
         db.query(Event).filter(Event.tag_id == tag_id).delete()
 
@@ -570,7 +581,8 @@ def delete_towel(tag_id: str, _=Depends(verify_key)):
         return {
             "message": f"Towel {tag_id} permanently deleted",
             "tag_id": tag_id,
-            "note": "All events for this tag have also been removed"
+            "total_washes": deleted_log.total_washes,
+            "logged_to": "deleted_tags table"
         }
     finally:
         db.close()
