@@ -984,14 +984,20 @@ var mainEl   = document.getElementById('main-content');
 var titleEl  = document.getElementById('page-title');
 var navLinks = document.querySelectorAll('.sidebar-nav a');
 
-function navigate(view) {
+async function navigate(view) {
   currentView = view;
   var v = views[view] || views.overview;
   titleEl.textContent = v.title;
-  mainEl.innerHTML = v.render();
   navLinks.forEach(function(a) {
     a.classList.toggle('active', a.getAttribute('data-view') === view);
   });
+  var result = v.render();
+  if (result && typeof result.then === 'function') {
+    mainEl.innerHTML = '<div style="text-align:center;padding:40px;color:var(--dim)">Loading...</div>';
+    mainEl.innerHTML = await result;
+  } else {
+    mainEl.innerHTML = result;
+  }
 }
 
 navLinks.forEach(function(a) {
