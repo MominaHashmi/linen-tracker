@@ -297,12 +297,7 @@ async def daily_report():
             </div>
         </div>
         """
-
-        send_email(subject, html_body)
-
-#----------------------------------------------------------------------------------------------------------------------------------------------------------
-
-# Get tags deleted in the last 24 hours for email report
+        # Get tags deleted in the last 24 hours for email report
 from datetime import timedelta
 recent_deleted = db.query(DeletedTag).filter(
     DeletedTag.deleted_at >= datetime.datetime.utcnow() - timedelta(hours=24)
@@ -330,6 +325,12 @@ if recent_deleted:
     """
 else:
     deleted_section = ""
+    
+        send_email(subject, html_body)
+
+#----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
 
 #----------------------------------------------------------------------------------------------------------------------------------------------------------
 # ============================================================
