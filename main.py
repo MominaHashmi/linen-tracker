@@ -96,6 +96,64 @@ WASH_CRITICAL = 190   # Less than 10 remaining — critical
 # it stops. Everything before yield = startup, after = shutdown.
 # ============================================================
 
+#-----------------------------------------------------------------------------------------------------------------
+
+async def daily_report():
+    while True:
+        now = datetime.datetime.utcnow()
+        next_8am = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        if now >= next_8am:
+            next_8am += datetime.timedelta(days=1)
+        seconds_until_8am = (next_8am - now).total_seconds()
+        print(f"Daily report scheduled in {seconds_until_8am/3600:.1f} hours")
+        await asyncio.sleep(seconds_until_8am)
+
+        db = SessionLocal()
+        try:
+            total      = db.query(Towel).count()
+            registered = db.query(Towel).filter(Towel.status == "registered").count()
+            in_use     = db.query(Towel).filter(Towel.status == "in_use").count()
+            in_laundry = db.query(Towel).filter(Towel.status == "in_laundry").count()
+            missing    = db.query(Towel).filter(Towel.status == "missing").count()
+            missing_towels = db.query(Towel).filter(Towel.status == "missing").all()
+            recent_deleted = db.query(DeletedTag).filter(
+                DeletedTag.deleted_at >= datetime.datetime.utcnow() - datetime.timedelta(hours=24)
+            ).all()
+        finally:
+            db.close()
+
+        is_urgent = missing >= 5
+        subject = f"🚨 URGENT — {missing} Towels Missing | Linen Report" if is_urgent else f"📊 Daily Linen Report — {datetime.datetime.utcnow().strftime('%d %b %Y')}"
+
+        if missing_towels:
+            missing_rows = "".join([
+                f"<tr><td style='padding:8px'>{t.tag_id}</td>"
+                f"<td style='padding:8px'>{t.towel_type or '—'}</td>"
+                f"<td style='padding:8px'>{t.last_location or '—'}</td></tr>"
+                for t in missing_towels
+            ])
+            missing_section = f"<h3>Missing Towels</h3><table>{missing_rows}</table>"
+        else:
+            missing_section = "<p style='color:#166534'>✓ No missing towels today</p>"
+
+        if recent_deleted:
+            deleted_rows = "".join([
+                f"<tr><td style='padding:8px'>{d.tag_id}</td>"
+                f"<td style='padding:8px'>{d.towel_type or '—'}</td>"
+                f"<td style='padding:8px'>{d.total_washes}</td>"
+                f"<td style='padding:8px'>{d.reason or '—'}</td></tr>"
+                for d in recent_deleted
+            ])
+            deleted_section = f"<h3>Deleted Today</h3><table>{deleted_rows}</table>"
+        else:
+            deleted_section = ""
+
+        urgent_banner = f"<div style='background:#dc2626;color:white;padding:12px'>⚠ ALERT: {missing} towels missing over 24 hours.</div>" if is_urgent else ""
+
+        html_body = f"""
+        <div style='font-family:A
+
+#---------------------------------------------------------------------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app):
     init_db()                                   # Create DB tables if they don't exist yet
