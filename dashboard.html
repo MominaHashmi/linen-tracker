@@ -938,32 +938,50 @@ function switchExportTab(tab) {
 // ============================================================
 // VIEW: DELETED TAGS — audit trail of all deleted tags
 // ============================================================
+// ============================================================
+// VIEW: DELETED TAGS
+// Fetches deleted tag history from the API
+// Shows total deleted count and combined wash cycles lost
+// ============================================================
 async function deletedView() {
-  var res = await fetch(API_BASE + '/deleted', { headers: { 'hotel-linen-2026-xK9mP': API_KEY } });
-  var data = await res.json();
-  var tags = data.tags || [];
+  try {
+    // Fetch deleted tags from API — requires API key
+    var res = await fetch(API_BASE + '/deleted', { 
+      headers: { 'X-API-Key': API_KEY } 
+    });
+    var data = await res.json();
+    var tags = data.tags || [];
+    var totalDeleted = tags.length; // count from array, not data.total_deleted
 
-  var rows = tags.length === 0
-    ? '<tr><td colspan="6" class="state-empty">✓ No tags have been deleted</td></tr>'
-    : tags.map(function(t) {
-        return '<tr>' +
-          '<td><code>' + t.tag_id + '</code></td>' +
-          '<td>' + (t.towel_type||'—') + '</td>' +
-          '<td style="font-family:\'DM Mono\',monospace;font-size:.7rem">' + (t.total_washes||0) + '</td>' +
-          '<td>' + (t.last_location||'—') + '</td>' +
-          '<td style="color:var(--red);font-size:.75rem">' + (t.reason||'—') + '</td>' +
-          '<td style="font-size:.68rem;color:var(--dim)">' + (t.deleted_at ? t.deleted_at.slice(0,16).replace('T',' ') : '—') + '</td>' +
-        '</tr>';
-      }).join('');
+    // Build table rows for each deleted tag
+    var rows = tags.length === 0
+      ? '<tr><td colspan="6" class="state-empty">✓ No tags have been deleted</td></tr>'
+      : tags.map(function(t) {
+          return '<tr>' +
+            '<td><code>' + t.tag_id + '</code></td>' +
+            '<td>' + (t.towel_type || '—') + '</td>' +
+            '<td style="font-family:\'DM Mono\',monospace;font-size:.7rem">' + (t.total_washes || 0) + '</td>' +
+            '<td>' + (t.last_location || '—') + '</td>' +
+            '<td style="color:var(--red);font-size:.75rem">' + (t.reason || '—') + '</td>' +
+            '<td style="font-size:.68rem;color:var(--dim)">' + (t.deleted_at ? t.deleted_at.slice(0,16).replace('T',' ') : '—') + '</td>' +
+          '</tr>';
+        }).join('');
 
-  return '<div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">' +
-    '<div class="kpi kpi-red"><div class="kpi-label">Total Deleted</div><div class="kpi-value">' + data.total_deleted + '</div><div class="kpi-sub">Permanent removals</div></div>' +
-    '<div class="kpi kpi-orange"><div class="kpi-label">Washes Lost</div><div class="kpi-value">' + tags.reduce(function(s,t){return s+(t.total_washes||0);},0) + '</div><div class="kpi-sub">Combined wash cycles</div></div>' +
-  '</div>' +
+    // Calculate total wash cycles lost across all deleted tags
+    var washesLost = tags.reduce(function(sum, t) { return sum + (t.total_washes || 0); }, 0);
 
-  '<div class="panel full"><div class="panel-head"><h2>Deleted Tags History</h2><span class="pill pill-live">● Live · ' + data.total_deleted + ' records</span></div>' +
-  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Washes</th><th>Last Location</th><th>Reason</th><th>Deleted At</th></tr></thead>' +
-  '<tbody>' + rows + '</tbody></table></div>';
+    return '<div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">' +
+      '<div class="kpi kpi-red"><div class="kpi-label">Total Deleted</div><div class="kpi-value">' + totalDeleted + '</div><div class="kpi-sub">Permanent removals</div></div>' +
+      '<div class="kpi kpi-orange"><div class="kpi-label">Washes Lost</div><div class="kpi-value">' + washesLost + '</div><div class="kpi-sub">Combined wash cycles</div></div>' +
+    '</div>' +
+    '<div class="panel full"><div class="panel-head"><h2>Deleted Tags History</h2><span class="pill pill-live">● Live · ' + totalDeleted + ' records</span></div>' +
+    '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Washes</th><th>Last Location</th><th>Reason</th><th>Deleted At</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div>';
+
+  } catch(e) {
+    // Show error if API call fails
+    return '<div class="state-error">⚠ Could not load deleted tags — ' + e.message + '</div>';
+  }
 }
 
 
