@@ -118,6 +118,9 @@ app.add_middleware(
     allow_methods=["*"],     # Allow GET, POST, PATCH and all other methods
     allow_headers=["*"],     # Allow all headers
 )
+@app.on_event("startup")
+def startup():
+    init_db()
 
 
 # ============================================================
