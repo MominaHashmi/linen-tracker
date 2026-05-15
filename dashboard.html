@@ -301,6 +301,7 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
     <a data-view="lifecycle"><span class="icon">♻️</span> Lifecycle</a>
     <a data-view="events"><span class="icon">⚡</span> Live Events</a>
     <a data-view="export"><span class="icon">📥</span> Export</a>
+    <a data-view="deleted"><span class="icon">🗑</span> Deleted Tags</a>
   </nav>
   <div class="sidebar-status">
     <div><span class="dot"></span><span>API Connected</span></div>
@@ -932,6 +933,42 @@ function switchExportTab(tab) {
   navigate('export');
 }
 
+  #--------------------------------------------------------------------------------------------------------------------------------------
+// ============================================================
+// VIEW: DELETED TAGS — audit trail of all deleted tags
+// ============================================================
+async function deletedView() {
+  var res = await fetch(API_BASE + '/deleted', { headers: { 'X-API-Key': API_KEY } });
+  var data = await res.json();
+  var tags = data.tags || [];
+
+  var rows = tags.length === 0
+    ? '<tr><td colspan="6" class="state-empty">✓ No tags have been deleted</td></tr>'
+    : tags.map(function(t) {
+        return '<tr>' +
+          '<td><code>' + t.tag_id + '</code></td>' +
+          '<td>' + (t.towel_type||'—') + '</td>' +
+          '<td style="font-family:\'DM Mono\',monospace;font-size:.7rem">' + (t.total_washes||0) + '</td>' +
+          '<td>' + (t.last_location||'—') + '</td>' +
+          '<td style="color:var(--red);font-size:.75rem">' + (t.reason||'—') + '</td>' +
+          '<td style="font-size:.68rem;color:var(--dim)">' + (t.deleted_at ? t.deleted_at.slice(0,16).replace('T',' ') : '—') + '</td>' +
+        '</tr>';
+      }).join('');
+
+  return '<div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">' +
+    '<div class="kpi kpi-red"><div class="kpi-label">Total Deleted</div><div class="kpi-value">' + data.total_deleted + '</div><div class="kpi-sub">Permanent removals</div></div>' +
+    '<div class="kpi kpi-orange"><div class="kpi-label">Washes Lost</div><div class="kpi-value">' + tags.reduce(function(s,t){return s+(t.total_washes||0);},0) + '</div><div class="kpi-sub">Combined wash cycles</div></div>' +
+  '</div>' +
+
+  '<div class="panel full"><div class="panel-head"><h2>Deleted Tags History</h2><span class="pill pill-live">● Live · ' + data.total_deleted + ' records</span></div>' +
+  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Washes</th><th>Last Location</th><th>Reason</th><th>Deleted At</th></tr></thead>' +
+  '<tbody>' + rows + '</tbody></table></div>';
+}
+
+
+  #------------------------------------------------------------------------------------------------------------------------------------------
+
+
 // ============================================================
 // ROUTER — handles sidebar navigation
 // ============================================================
@@ -942,6 +979,7 @@ var views = {
   lifecycle: { title: 'Lifecycle',      render: lifecycleView },
   events:    { title: 'Live Events',    render: eventsView },
   export:    { title: 'Export',         render: exportView }
+  deleted: { title: 'Deleted Tags', render: deletedView }
 };
 
 var currentView = 'overview';
