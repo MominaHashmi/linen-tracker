@@ -221,35 +221,101 @@ app.add_middleware(
 # ============================================================
 # DATA MODEL
 # ============================================================
+# ============================================================
+# DATA MODEL — what a "register towel" request must include
+# Accepts the raw EPC from the RFID scan instead of a typed tag_id
+# The system generates the friendly tag_id automatically
+# ============================================================
 class TowelCreate(BaseModel):
-    tag_id: str
-    towel_type: str
+    epc: str           # Raw hex code scanned from the RFID chip
+    towel_type: str    # bath, hand, pool, face — used to generate the ID prefix
+
+
+# ============================================================
+# TAG ID PREFIX MAP
+# Maps towel type to the letter used in the generated tag ID
+# ============================================================
+TYPE_PREFIX = {
+    "bath": "B",
+    "hand": "H",
+    "pool": "P",
+    "face": "F",
+}
+
+
+def generate_next_tag_id(db, towel_type: str) -> str:
+    """
+    Looks at all existing towels of this type, finds the highest
+    number used so far, and returns the next one.
+    Example: if TOWEL-H-003 is the highest hand towel, returns TOWEL-H-004
+    """
+    prefix = TYPE_PREFIX.get(towel_type, "X")  # X = unknown type fallback
+
+    existing = db.query(Towel).filter(Towel.towel_type == towel_type).all()
+
+    numbers = []
+    for t in existing:
+        parts = t.tag_id.split("-")
+        if len(parts) == 3 and parts[2].isdigit():
+            numbers.append(int(parts[2]))
+
+    next_number = max(numbers, default=0) + 1
+    return f"TOWEL-{prefix}-{next_number:03d}"
 
 # ============================================================
 # ENDPOINTS
 # ============================================================
 
+# --- Register a new towel ---
+# POST /towels
+# Body: { "epc": "E2003412...", "towel_type": "hand" }
+# Tag ID is auto-generated based on type, e.g. TOWEL-H-001
 @app.post("/towels")
 def register_towel(towel: TowelCreate, _=Depends(verify_key)):
     db = SessionLocal()
-    existing = db.query(Towel).filter(Towel.tag_id == towel.tag_id).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Tag ID already registered")
-    new_towel = Towel(
-        tag_id=towel.tag_id,
-        towel_type=towel.towel_type,
-        status="registered",
-        last_location="Store",
-        wash_count=0,
-        created_at=datetime.datetime.utcnow()
-    )
-    db.add(new_towel)
-    db.commit()
-    event = Event(tag_id=towel.tag_id, event_type="REGISTERED", created_at=datetime.datetime.utcnow())
-    db.add(event)
-    db.commit()
-    db.close()
-    return {"message": "Towel registered successfully", "tag_id": towel.tag_id}
+    try:
+        # Block duplicate EPCs — same physical chip can't be registered twice
+        existing_epc = db.query(Towel).filter(Towel.epc == towel.epc).first()
+        if existing_epc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"This RFID tag is already registered as {existing_epc.tag_id}"
+            )
+
+        # Auto-generate the friendly tag ID based on type
+        new_tag_id = generate_next_tag_id(db, towel.towel_type)
+
+        new_towel = Towel(
+            tag_id=new_tag_id,
+            epc=towel.epc,
+            towel_type=towel.towel_type,
+            status="registered",
+            last_location="Store",
+            wash_count=0,
+            created_at=datetime.datetime.utcnow()
+        )
+        db.add(new_towel)
+        db.commit()
+
+        event = Event(
+            tag_id=new_tag_id,
+            event_type="REGISTERED",
+            created_at=datetime.datetime.utcnow()
+        )
+        db.add(event)
+        db.commit()
+
+        return {
+            "message": "Towel registered successfully",
+            "tag_id": new_tag_id,
+            "epc": towel.epc,
+            "towel_type": towel.towel_type,
+            "registered_on": new_towel.created_at.strftime("%Y-%m-%d %H:%M")
+        }
+    finally:
+        db.close()
+
+#------------------------------------------------------------------------------------------------------------------
 
 
 @app.get("/towels")
