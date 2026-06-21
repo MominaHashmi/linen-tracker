@@ -618,22 +618,19 @@ function selectType(type) {
 }
 
 async function doRegister() {
-  var tag = document.getElementById('reg-tag-input').value.trim().toUpperCase();
-
-  if (!tag)          { showFeedback('error', 'No tag entered', 'Scan or type a Tag ID first'); return; }
+  var epc = document.getElementById('reg-tag-input').value.trim();
+  if (!epc)          { showFeedback('error', 'No tag scanned', 'Scan the RFID tag first'); return; }
   if (!selectedType) { showFeedback('error', 'No type selected', 'Select Bath, Hand, Pool or Face before registering'); return; }
-
   try {
     var res = await fetch(API_BASE + '/towels', {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ tag_id: tag, towel_type: selectedType })
+      body: JSON.stringify({ epc: epc, towel_type: selectedType })
     });
     var data = await res.json();
-
     if (res.ok) {
-      showFeedback('success', 'Towel registered', 'Added to inventory as ' + selectedType + ' towel', tag);
-      addLog('REGISTERED', tag + ' (' + selectedType + ')', 'var(--green)');
+      showFeedback('success', 'Towel registered as ' + data.tag_id, 'Type: ' + selectedType + ' · Registered: ' + data.registered_on, data.tag_id);
+      addLog('REGISTERED', data.tag_id + ' (' + selectedType + ')', 'var(--green)');
       // Clear the register form for next towel
       document.getElementById('reg-tag-input').value = '';
       selectedType = '';
@@ -641,9 +638,9 @@ async function doRegister() {
       document.getElementById('reg-tag-input').focus();
       fetchInventory();
     } else if (res.status === 400) {
-      showFeedback('error', 'Already registered', 'This Tag ID already exists in the system', tag);
+      showFeedback('error', 'Already registered', data.detail, epc);
     } else {
-      showFeedback('error', 'Something went wrong', data.detail || 'Unknown error');
+      showFeedback('error', 'Something went wrong', typeof data.detail === 'string' ? data.detail : JSON.stringify(data.detail));
     }
   } catch(e) {
     showFeedback('error', 'Cannot reach server', 'Check your internet connection');
