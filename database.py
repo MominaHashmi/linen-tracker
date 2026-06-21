@@ -28,6 +28,7 @@ class TowelStatus(enum.Enum):
 class Towel(Base):
     __tablename__ = "towels"
     tag_id = Column(String, primary_key=True)
+    epc = Column(String, nullable=True, unique=True)  # Raw RFID hex code from the chip
     towel_type = Column(String)
     status = Column(String, default="registered")
     last_location = Column(String, nullable=True)
