@@ -549,21 +549,56 @@ function overviewView() {
 // ============================================================
 // VIEW: INVENTORY — full towel registry
 // ============================================================
-function inventoryView() {
-  var byStatus = { registered:0, in_use:0, in_laundry:0, missing:0 };
-  LIVE.towels.forEach(function(t){ if(byStatus[t.status] !== undefined) byStatus[t.status]++; });
+// Search state for the Inventory tab — kept separate from Export filters
+var inventorySearch = '';
 
-  var rows = LIVE.towels.length === 0
-    ? '<tr><td colspan="5" class="state-empty">No towels yet — run seed.py to add test towels</td></tr>'
-    : LIVE.towels.map(function(t) {
+// Called when typing in the Inventory search box
+function applyInventorySearch() {
+  inventorySearch = document.getElementById('inv-search') ? document.getElementById('inv-search').value.toLowerCase().trim() : '';
+  navigate('inventory');
+}
+
+// Formats an ISO timestamp into a short readable date + time
+function formatRegisteredDate(isoStr) {
+  if (!isoStr) return '—';
+  var d = new Date(isoStr + 'Z'); // backend stores UTC without timezone marker
+  return d.toLocaleDateString('en-US', { day:'2-digit', month:'short', year:'numeric' }) +
+    ' · ' + d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+}
+
+function inventoryView() {
+  // Filter towels by search term — matches against tag_id OR epc (raw hex)
+  var filteredTowels = LIVE.towels.filter(function(t) {
+    if (!inventorySearch) return true;
+    var tagMatch = (t.tag_id || '').toLowerCase().includes(inventorySearch);
+    var epcMatch = (t.epc || '').toLowerCase().includes(inventorySearch);
+    return tagMatch || epcMatch;
+  });
+
+  var rows = filteredTowels.length === 0
+    ? '<tr><td colspan="6" class="state-empty">' + (inventorySearch ? 'No towels match "' + inventorySearch + '"' : 'No towels yet — run seed.py to add test towels') + '</td></tr>'
+    : filteredTowels.map(function(t) {
         return '<tr>' +
           '<td><code>' + t.tag_id + '</code></td>' +
           '<td>' + (t.towel_type||'—') + '</td>' +
           '<td>' + statusTag(t.status) + '</td>' +
           '<td>' + (t.last_location||'—') + '</td>' +
           '<td style="font-family:\'DM Mono\',monospace;font-size:.7rem">' + (t.wash_count||0) + '</td>' +
+          '<td style="font-size:.7rem;color:var(--dim)">' + formatRegisteredDate(t.created_at) + '</td>' +
         '</tr>';
       }).join('');
+
+  // Search bar — filters the table below by tag ID or raw EPC hex
+  var searchBar = '<div style="display:flex;align-items:center;gap:8px;padding:12px 18px;background:var(--bg);border-bottom:1px solid var(--border)">' +
+    '<input id="inv-search" type="text" placeholder="🔍 Search by Tag ID or EPC hex..." value="' + inventorySearch + '" ' +
+      'oninput="applyInventorySearch()" ' +
+      'style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:.75rem;' +
+      'background:var(--surface);color:var(--dark);outline:none;width:260px;font-family:\'DM Mono\',monospace"/>' +
+    (inventorySearch ? '<button onclick="document.getElementById(\'inv-search\').value=\'\';applyInventorySearch()" style="padding:6px 10px;border:1px solid var(--red-border);border-radius:6px;font-size:.72rem;background:var(--red-bg);color:var(--red);cursor:pointer;font-family:\'DM Sans\',sans-serif">✕ Clear</button>' : '') +
+    '<span style="margin-left:auto;font-size:.72rem;color:var(--dim)">' +
+      (inventorySearch ? '<strong style="color:var(--blue)">' + filteredTowels.length + '</strong> of ' + LIVE.towels.length : LIVE.towels.length) +
+    ' towels</span>' +
+  '</div>';
 
   return '<div class="kpi-row">' +
     '<div class="kpi kpi-blue"><div class="kpi-label">Total</div><div class="kpi-value">' + LIVE.total + '</div></div>' +
@@ -572,9 +607,12 @@ function inventoryView() {
     '<div class="kpi kpi-orange"><div class="kpi-label">In Laundry</div><div class="kpi-value">' + LIVE.in_laundry + '</div></div>' +
   '</div>' +
 
-  '<div class="panel full"><div class="panel-head"><h2>Towel Registry</h2><span class="pill pill-live">Live · ' + LIVE.towels.length + ' records</span></div>' +
-  '<table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Last Location</th><th>Wash Count</th></tr></thead>' +
-  '<tbody>' + rows + '</tbody></table></div>';
+  '<div class="panel full" style="padding:0;overflow:hidden">' +
+    '<div class="panel-head" style="padding:18px 18px 0"><h2>Towel Registry</h2><span class="pill pill-live">Live · ' + LIVE.towels.length + ' records</span></div>' +
+    searchBar +
+    '<div style="padding:0 18px 18px"><table class="tbl"><thead><tr><th>Tag ID</th><th>Type</th><th>Status</th><th>Last Location</th><th>Wash Count</th><th>Registered</th></tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div>' +
+  '</div>';
 }
 
 // ============================================================
